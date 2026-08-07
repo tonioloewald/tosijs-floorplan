@@ -471,3 +471,24 @@ describe('decorate — the plugin seam', () => {
     expect(svg.indexOf('data-plugin')).toBeLessThan(svg.indexOf('</g>'))
   })
 })
+
+describe('producer compatibility — interface-typed maps assign without casts', () => {
+  test("a describe()-shaped interface flows straight in", () => {
+    // mirrors tosijs's AgentDescription: an INTERFACE (no implicit index
+    // signature) with extra fields — must satisfy SchematicDescription
+    interface ProducerShape {
+      roots: Record<string, string>
+      wiring: Array<{ tag: string; bounds?: { x: number; y: number; width: number; height: number }; [k: string]: unknown }>
+      actions: string[]
+      exposure: 'introspection' | 'manifest'
+    }
+    const map: ProducerShape = {
+      roots: { app: 'object' },
+      wiring: [{ tag: 'button', text: 'go', on: { click: 'app.go' }, bounds: { x: 0, y: 0, width: 40, height: 20 } }],
+      actions: ['app.go'],
+      exposure: 'introspection',
+    }
+    const svg = schematicSVG(map) // the assignment IS the assertion
+    expect(svg).toContain('data-record="0"')
+  })
+})

@@ -47,10 +47,17 @@ export interface SchematicRecord {
   [boundProp: string]: unknown
 }
 
-/** the map: only `wiring` is read — producers may carry anything else */
+/** the map: only `wiring` is read. The named optional fields are the
+ * known producer extras (tosijs's describe() shape) — deliberately NOT an
+ * index signature, which would stop interface-typed producers (TS gives
+ * implicit index signatures to literals, never to interfaces) from
+ * assigning without casts. */
 export interface SchematicDescription {
   wiring: SchematicRecord[]
-  [extra: string]: unknown
+  roots?: unknown
+  actions?: unknown
+  exposure?: unknown
+  contract?: unknown
 }
 
 
