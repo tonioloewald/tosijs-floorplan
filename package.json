@@ -1,0 +1,40 @@
+{
+  "name": "tosijs-schematic",
+  "version": "0.1.0",
+  "description": "Render an agent-surface map (plain records) as a schematic SVG — the affordance grammar as a pure, dependency-free function. No DOM, no framework.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "Tonio Loewald",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tonioloewald/tosijs-schematic.git"
+  },
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src", "LICENSE", "README.md"],
+  "scripts": {
+    "build": "bun build src/index.ts --outdir dist --format esm && tsc -p tsconfig.json",
+    "test": "bun test",
+    "prepublishOnly": "bun test && bun run build"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  },
+  "keywords": [
+    "schematic",
+    "svg",
+    "agent",
+    "accessibility",
+    "affordance",
+    "wireframe",
+    "tosijs",
+    "webmcp"
+  ]
+}
