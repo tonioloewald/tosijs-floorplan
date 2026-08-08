@@ -1,6 +1,6 @@
 {
   "name": "tosijs-schematic",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Render an agent-surface map (plain records) as a schematic SVG — the affordance grammar as a pure, dependency-free function. No DOM, no framework.",
   "type": "module",
   "license": "Apache-2.0",

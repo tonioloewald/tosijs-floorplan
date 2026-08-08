@@ -66,6 +66,9 @@ One flat record per wired element. Producers may add fields beyond these —
 | field | type | meaning |
 | --- | --- | --- |
 | `tag` | `string` | lowercase tag name (required) |
+| `ref` | `string` | a durable, actionable handle from the producer (survives re-renders — an agent can *act* on it, where an index only *looks up*) |
+| `flags` | `{kind, label, severity?}[]` | computed verdicts about the element (contrast ratios, target sizes, …) |
+| `image` | `string` | data-URL snapshot of inline media, drawn in place — pixels a pure renderer can't obtain |
 | `bounds` | `{x, y, width, height}` | page-coordinate geometry — layout is part of the semantics; zero-size or absent = not drawn |
 | `label` | `string` | the accessible **name** (aria-label, resolved labelledby, `<label>` association, title, alt) |
 | `placeholder` | `string` | the hint — deliberately distinct from `label`: an empty input must never read as content |
@@ -107,11 +110,17 @@ checkbox sizes.
 | double outline | keyboard focus — where the user is |
 | faint dotted | structure — including list *containers* (their items are the affordances) |
 | number, top-right, on a white backdrop | the record's index (`index: true`) — the raster form of `data-record`: read it off the image, look up `wiring[n]` |
+| a `ref` (e.g. `@42`), top-right | the producer's **durable, actionable handle** — takes the index slot when present, survives re-renders, rides the group as `data-ref` |
+| colored bars, left edge | computed **verdicts** (`flags`): WCAG contrast failures and friends — error red, warn amber, info gray, first flag's label shown |
+| pixels inside a box | embedded media (`image`: a data URL) — the producer's snapshot of inline `<svg>`/`<canvas>`, drawn in place |
 
 Captions tell the truth in priority order: a held **value** wins (as
 `label: value` when both are known), an empty control falls back to its
 *hint*, then label, then text. Containers holding other drawn boxes get no
-text-derived caption — their children speak.
+text-derived caption — their children speak. Captions **wrap** when the box
+affords more than one line — a paragraph that wraps on the real page has
+the same vertical room here — and only truncate (with `…`) when the
+geometry genuinely runs out.
 
 ## API
 

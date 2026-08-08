@@ -492,3 +492,79 @@ describe('producer compatibility — interface-typed maps assign without casts',
     expect(svg).toContain('data-record="0"')
   })
 })
+
+describe('the haltija convergence — ref, flags, image, wrapping (0.2.0)', () => {
+  const at = (x: number, y: number, width = 160, height = 24) => ({ x, y, width, height })
+
+  test('ref: a durable handle takes the index slot and rides the group', () => {
+    const map: SchematicDescription = {
+      wiring: [
+        { tag: 'button', text: 'go', ref: '@42', bounds: at(10, 10) },
+        { tag: 'button', text: 'stop', bounds: at(10, 40) },
+      ],
+    }
+    const svg = schematicSVG(map, { index: true })
+    expect(svg).toContain('data-ref="@42"')
+    expect(svg).toContain('>@42</text>') // rendered in preference to 0
+    expect(svg).not.toContain('>0</text>')
+    expect(svg).toContain('>1</text>') // no ref → the index, as before
+    // a ref renders even without index: true — the producer asked for it
+    const bare = schematicSVG(map)
+    expect(bare).toContain('>@42</text>')
+  })
+
+  test('flags: severity bars on the left edge, first label shown', () => {
+    const map: SchematicDescription = {
+      wiring: [
+        {
+          tag: 'button',
+          text: 'low contrast',
+          flags: [
+            { kind: 'contrast', label: '2.3:1', severity: 'error' },
+            { kind: 'target-size', label: 'small', severity: 'warn' },
+          ],
+          bounds: at(10, 10),
+        },
+      ],
+    }
+    const svg = schematicSVG(map)
+    expect(svg).toContain('data-flag="contrast"')
+    expect(svg).toContain('data-flag="target-size"')
+    expect(svg).toContain('fill="#d32f2f" data-flag') // error color
+    expect(svg).toContain('fill="#e6a700" data-flag') // warn color
+    expect(svg).toContain('>2.3:1</text>') // first flag's label
+    expect(svg).not.toContain('>small</text>') // later labels stay quiet
+  })
+
+  test('image: a data-URL draws in place, behind the captions', () => {
+    const px =
+      'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw=='
+    const map: SchematicDescription = {
+      wiring: [
+        { tag: 'canvas', label: 'starfield', image: px, bounds: at(10, 10, 200, 100) },
+        { tag: 'img', text: 'no data', image: 'https://not-a-data-url', bounds: at(10, 120) },
+      ],
+    }
+    const svg = schematicSVG(map)
+    expect(svg).toContain(`href="${px}"`)
+    expect(svg).toContain('preserveAspectRatio="xMidYMid meet"')
+    expect(svg).not.toContain('not-a-data-url') // non-data URLs are refused
+  })
+
+  test('wrapping: captions use vertical room instead of truncating', () => {
+    const longText =
+      'the quick brown fox jumps over the lazy dog and keeps going for a while'
+    const map: SchematicDescription = {
+      wiring: [
+        { tag: 'p', text: longText, bounds: at(10, 10, 300, 60) },
+        { tag: 'span', text: longText, bounds: at(10, 90, 300, 20) },
+      ],
+    }
+    const svg = schematicSVG(map)
+    expect(svg).toContain('<tspan') // the tall box wraps
+    expect(svg).toContain('jumps') // text past the old 36-char cut survives
+    // the short box still gets exactly one line, no tspans
+    const shortLine = svg.slice(svg.lastIndexOf('<text'))
+    expect(shortLine).not.toContain('<tspan')
+  })
+})
