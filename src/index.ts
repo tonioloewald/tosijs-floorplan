@@ -1,5 +1,8 @@
 /**
- * tosijs-schematic — render an agent-surface map as a schematic SVG.
+ * tosijs-floorplan — render an agent-surface map as a floorplan SVG.
+ *
+ * (Formerly tosijs-schematic — renamed to stop near-colliding with
+ * tosijs-schema. Exported API names are unchanged.)
  *
  * A PURE FUNCTION over plain data: one record per wired element, drawn at
  * its true geometry, wearing the affordance grammar. No DOM, no framework,

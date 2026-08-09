@@ -1,9 +1,22 @@
 # Changelog
 
-All notable changes to **tosijs-schematic** are documented here
+All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
+are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
 ## [0.3.0] - 2026-08-09
+
+### Renamed — tosijs-schematic → tosijs-floorplan
+
+The old name near-collided with **tosijs-schema** (the JSON-schema
+validation library) and confused readers in practice. Renamed while the
+mental debt was small: before any external consumer shipped a dependency
+(haltija adopts at its 1.13; tosijs vendors the source file). 0.3.0 is the
+first release under the new name; `tosijs-schematic` is deprecated on npm
+at 0.2.0 with a pointer here. **Exported API names are unchanged**
+(`schematic()`, `schematicSVG()`, `SchematicRecord`, …) — the drawing is
+still a schematic in the common-noun sense, and the record format is a
+multi-producer contract mid-adoption.
 
 ### Added — small elements stop lying by omission
 

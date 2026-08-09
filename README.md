@@ -1,24 +1,30 @@
-# tosijs-schematic
+# tosijs-floorplan
 
 Render an **agent-surface map** — plain records describing a UI's wired
-elements — as a schematic SVG: one shape per element at its true geometry,
+elements — as a floorplan SVG: one shape per element at its true geometry,
 wearing an explicit **affordance grammar** so "can I act here?" never needs
-guessing.
+guessing. Like a floorplan of a building, it documents a *real, live*
+structure — where the doors are, which ones open.
 
 It is a **pure function over plain data**. No DOM, no framework, no
 dependencies. The map travels as JSON, so the renderer runs in the page, in
 a headless embodiment, in a test harness, or on the far side of a wire from
 an app nobody is viewing.
 
-> **Not [tosijs-schema](https://github.com/tonioloewald/tosijs-schema)!**
-> That's the JSON-schema validation library. The near-collision is honest
-> cross-fertilization rather than carelessness: schemas become *contracts*,
-> contracts ride the *map*, and the map is what this package draws.
+> **Formerly `tosijs-schematic`** (deprecated on npm at 0.2.0; renamed
+> before its first external consumer shipped). The old name near-collided
+> with [tosijs-schema](https://github.com/tonioloewald/tosijs-schema), the
+> JSON-schema validation library, and confused readers in practice — an
+> honest hazard of real cross-fertilization: schemas become *contracts*,
+> contracts ride the *map*, and the map is what this package draws. The
+> **exported API keeps its names** (`schematic()`, `SchematicRecord`, …):
+> the drawing is still a schematic in the common-noun sense, and the record
+> format is a multi-producer contract mid-adoption.
 
 ## Install
 
 ```
-npm add tosijs-schematic
+npm add tosijs-floorplan
 ```
 
 ## Quick start
@@ -28,7 +34,7 @@ output is already the record format:
 
 ```js
 import { enableAgentInterface } from 'tosijs'
-import { schematicSVG } from 'tosijs-schematic'
+import { schematicSVG } from 'tosijs-floorplan'
 
 const agent = enableAgentInterface()
 const svg = schematicSVG(agent.describe({ styles: true }))
@@ -38,7 +44,7 @@ Without tosijs, emit records yourself — anything that produces them gets
 the renderer and the grammar:
 
 ```js
-import { schematicSVG } from 'tosijs-schematic'
+import { schematicSVG } from 'tosijs-floorplan'
 
 const svg = schematicSVG({
   wiring: [

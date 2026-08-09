@@ -4,11 +4,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A **micro-library**: the schematic renderer for agent-surface maps, extracted
+A **micro-library**: the floorplan renderer for agent-surface maps, extracted
 from tosijs's *one user interface* work. One source file, one test file, a
 README that doubles as the **record-format specification**. It is deliberately
 boring: no doc site, no CI apparatus, no framework. Keep it that way until an
 external plugin gallery genuinely demands more.
+
+**Named `tosijs-floorplan` since 0.3.0** (formerly `tosijs-schematic`,
+deprecated on npm at 0.2.0 — the near-collision with `tosijs-schema`
+confused readers in practice). The **exported API keeps the schematic-\***
+names deliberately: it is a multi-producer contract mid-adoption. Do not
+"finish" the rename by renaming exports.
 
 ## Commands
 
@@ -27,8 +33,9 @@ npm publish        # prepublishOnly runs tests + build; publish is manual
 
 2. **tosijs VENDORS `src/index.ts` verbatim.** tosijs (the framework) takes
    this package as a devDependency and its build regenerates
-   `tosijs/src/schematic.ts` from `node_modules/tosijs-schematic/src/index.ts`
-   at every build (see `vendorSchematic()` in tosijs's `bin/site.ts`). That
+   `tosijs/src/schematic.ts` from `node_modules/tosijs-floorplan/src/index.ts`
+   (path updates with tosijs's adoption of the rename; check their
+   `vendorSchematic()` in `bin/site.ts` — issue filed on the rename). That
    means: `src/` ships in the npm tarball on purpose (`files` field); the
    source must remain a **single self-contained file**; and anything you
    change here lands inside tosijs's bundle on its next `bun update` +

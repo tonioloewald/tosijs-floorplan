@@ -1,13 +1,13 @@
 {
-  "name": "tosijs-schematic",
+  "name": "tosijs-floorplan",
   "version": "0.3.0",
-  "description": "Render an agent-surface map (plain records) as a schematic SVG — the affordance grammar as a pure, dependency-free function. No DOM, no framework.",
+  "description": "Render an agent-surface map (plain records) as a floorplan SVG — the affordance grammar as a pure, dependency-free function. No DOM, no framework. Formerly tosijs-schematic.",
   "type": "module",
   "license": "Apache-2.0",
   "author": "Tonio Loewald",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/tonioloewald/tosijs-schematic.git"
+    "url": "git+https://github.com/tonioloewald/tosijs-floorplan.git"
   },
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -18,7 +18,12 @@
       "import": "./dist/index.js"
     }
   },
-  "files": ["dist", "src", "LICENSE", "README.md"],
+  "files": [
+    "dist",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
   "scripts": {
     "build": "bun build src/index.ts --outdir dist --format esm && tsc -p tsconfig.json",
     "test": "bun test",
@@ -28,6 +33,7 @@
     "typescript": "^7.0.2"
   },
   "keywords": [
+    "floorplan",
     "schematic",
     "svg",
     "agent",
