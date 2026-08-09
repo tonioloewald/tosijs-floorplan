@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test'
-import { schematicSVG } from './index'
+import { schematicSVG, schematic } from './index'
 import { SchematicDescription } from './index'
 
 const description: SchematicDescription = {
@@ -52,15 +52,99 @@ describe('schematicSVG — pure, DOM-free rendering of the map', () => {
 
   test('root svg carries explicit width/height (intrinsic size; Firefox canvas-draw requires it)', () => {
     const svg = schematicSVG(description)
-    // bbox: x 10-260 (+8 pad both sides), y 20-68 (+8 both sides)
+    // bbox: x 10-260 (+8 pad both sides), y 20-68 (+8 both sides) — PLUS
+    // the 14px legend footer: the 8px button is cramped (its caption lives
+    // in the legend), and the image must confess that
     expect(svg).toContain('width="266"')
-    expect(svg).toContain('height="64"')
+    expect(svg).toContain('height="78"')
+    expect(svg).toContain('details in legend')
   })
 
   test('zero-size records (hidden elements) are not drawn', () => {
     const svg = schematicSVG(description)
     expect(svg).not.toContain('invisible')
     expect(svg).not.toContain('width="0"')
+  })
+
+  test('cramped records: bare box, auto stamp, metadata in the legend', () => {
+    const { svg, legend } = schematic(description)
+    // the 8px button (record 3): no caption drawn, but STAMPED unbidden
+    expect(svg).toContain('data-index-backdrop')
+    expect(svg).toContain('>3</text>')
+    const entry = legend.find((e) => e.index === 3)!
+    expect(entry).toBeDefined()
+    expect(entry.caption).toBe('a & "b" <c>') // unescaped truth, for JSON
+    expect(entry.tag).toBe('button')
+    // machine-readable confession rides the svg itself
+    expect(svg).toContain('<desc>')
+    expect(svg).toContain('pair this image with its legend JSON')
+  })
+
+  test('nothing elided = no footer, no desc, byte-stable output', () => {
+    const roomy: SchematicDescription = {
+      wiring: [
+        {
+          tag: 'input',
+          label: 'name',
+          value: 'ada ⟷ a.name',
+          bounds: { x: 10, y: 10, width: 200, height: 30 },
+        },
+      ],
+    }
+    const { svg, legend } = schematic(roomy)
+    expect(legend).toEqual([])
+    expect(svg).not.toContain('<desc>')
+    expect(svg).not.toContain('details in legend')
+    expect(svg).toBe(schematicSVG(roomy))
+  })
+
+  test('undersized interactive elements: amber bar + measured legend fact; toggles exempt', () => {
+    const tiny: SchematicDescription = {
+      wiring: [
+        {
+          tag: 'button',
+          text: 'x',
+          on: { click: 'app.del' },
+          bounds: { x: 10, y: 10, width: 18, height: 18 },
+        },
+        {
+          tag: 'input',
+          type: 'checkbox',
+          checked: true,
+          value: 'true ⟷ a.on',
+          bounds: { x: 40, y: 10, width: 13, height: 13 },
+        },
+        {
+          tag: 'span',
+          text: 'ok',
+          bounds: { x: 60, y: 10, width: 18, height: 18 },
+        },
+      ],
+    }
+    const { svg, legend } = schematic(tiny)
+    expect(svg).toContain('data-flag="target-size"')
+    const bar = legend.find((e) => e.undersized != null)!
+    expect(bar.index).toBe(0)
+    expect(bar.undersized).toBe('18×18 — below 24×24 (WCAG 2.5.8)')
+    // the checkbox (user-agent-sized) and the inert span are NOT flagged
+    expect(legend.filter((e) => e.undersized != null).length).toBe(1)
+    // raising the bar to the platform touch standard is one option away
+    const strict = schematic(tiny, { targetSize: 44 })
+    expect(strict.legend.find((e) => e.index === 0)!.undersized).toContain('44×44')
+    // and 0 disables the audit
+    expect(schematic(tiny, { targetSize: 0 }).legend.filter((e) => e.undersized).length).toBe(0)
+  })
+
+  test('truncated captions land whole in the legend', () => {
+    const longText =
+      'a caption far too long for the box it lives in, which keeps going'
+    const { legend } = schematic({
+      wiring: [
+        { tag: 'span', text: longText, bounds: { x: 0, y: 0, width: 80, height: 20 } },
+      ],
+    })
+    expect(legend.length).toBe(1)
+    expect(legend[0].caption).toBe(longText)
   })
 
   test('each group indexes back into description.wiring — the image as index', () => {

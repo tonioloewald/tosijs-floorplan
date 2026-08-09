@@ -113,6 +113,9 @@ checkbox sizes.
 | a `ref` (e.g. `@42`), top-right | the producer's **durable, actionable handle** — takes the index slot when present, survives re-renders, rides the group as `data-ref` |
 | colored bars, left edge | computed **verdicts** (`flags`): WCAG contrast failures and friends — error red, warn amber, info gray, first flag's label shown |
 | pixels inside a box | embedded media (`image`: a data URL) — the producer's snapshot of inline `<svg>`/`<canvas>`, drawn in place |
+| a bare box wearing only a stamped number | too small to label legibly — its caption, badges and flags live in the **legend**, matched by that number |
+| single amber bar, left edge | an interactive element below `targetSize` (default 24×24, WCAG 2.5.8; set 44/48 for the touch-target bar) — a usability defect in its own right; the measurement is in the legend |
+| footer strip: "N elements with details in legend" | the image's confession that it isn't the whole map — fetch `schematic().legend` (a machine-readable `<desc>` says the same) |
 
 Captions tell the truth in priority order: a held **value** wins (as
 `label: value` when both are known), an empty control falls back to its
@@ -126,14 +129,17 @@ geometry genuinely runs out.
 
 | export | what |
 | --- | --- |
-| `schematicSVG(description, options?)` | the renderer — returns an SVG string; each `<g>` carries `data-record="<i>"` linking back to `description.wiring[i]` (the image as index) |
+| `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend }`: the drawing plus the metadata it could not legibly carry (cramped/truncated/undersized records), keyed by index/ref. **Pair every raster with its legend.** |
+| `schematicSVG(description, options?)` | `schematic().svg` — the string-only form; each `<g>` carries `data-record="<i>"` linking back to `description.wiring[i]` (the image as index) |
 | `rasterizeSVG(svg, {scale})` | SVG → PNG Blob for vision encoders (browser canvas; under bun/node use `@resvg/resvg-js` — rasterize at 2× so labels OCR cleanly) |
 | `boundsOf(element)` | an element's page-coordinate bounds — the natural `within` argument |
 | `BOUND_TO_DOM`, `BOUND_TWO_WAY` | the provenance tokens |
 
 **Options**: `pad`, `minLabelHeight`, `maxCaption`, `fontSize`; `within`
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);
-`index: true` (stamp record indexes); `decorate` (below).
+`index: true` (stamp record indexes); `targetSize` (the undersized-audit
+floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
+the footer strip); `decorate` (below).
 
 ## Plugins (EXPERIMENTAL)
 
