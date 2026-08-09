@@ -73,6 +73,8 @@ One flat record per wired element. Producers may add fields beyond these —
 | `label` | `string` | the accessible **name** (aria-label, resolved labelledby, `<label>` association, title, alt) |
 | `placeholder` | `string` | the hint — deliberately distinct from `label`: an empty input must never read as content |
 | `text` | `string` | textContent, static (`"foo"`) or bound (`"foo ⟵ path"`) |
+| `href` | `string` | a link's destination — distinct from `text` ("the link *says* X" is not "the link *goes to* Y"). Captions fall back to it only when nothing else names the element; it always rides the **legend** |
+| `value` | `string` | a filled control's value, distinct from `label`/`placeholder` — static (`"3"`) or bound (`"3 ⟷ app.qty"`); the fact that distinguishes an empty form from a filled one |
 | `type` | `string` | input kind when not plain text (`checkbox`, `radio`, `range`, `email`, …) |
 | `checked` | `boolean` | live toggle state |
 | `focused` | `boolean` | holds keyboard focus right now |
@@ -91,6 +93,13 @@ One flat record per wired element. Producers may add fields beyond these —
 value reads `"<shown> <arrow> <path>"` — `⟵` means state flows to the DOM
 (display), `⟷` means two-way (a user-writable affordance). A plain string
 with no arrow is a live-but-unbound value.
+
+**The picture is not the whole payload.** The renderer is *allowed to omit*:
+captions and badges below legibility thresholds move to the legend, keyed by
+the stamped index/ref, and facts that never draw well (`href` above all)
+live there always. A consumer of the raster is expected to hold
+`schematic().legend` alongside it — the image says *where* and *which*; the
+legend says *what*.
 
 ## The grammar
 
@@ -116,6 +125,16 @@ checkbox sizes.
 | a bare box wearing only a stamped number | too small to label legibly — its caption, badges and flags live in the **legend**, matched by that number |
 | single amber bar, left edge | an interactive element below `targetSize` (default 24×24, WCAG 2.5.8; set 44/48 for the touch-target bar) — a usability defect in its own right; the measurement is in the legend |
 | footer strip: "N elements with details in legend" | the image's confession that it isn't the whole map — fetch `schematic().legend` (a machine-readable `<desc>` says the same) |
+
+The target-size audit honours WCAG 2.5.8's **inline exception** as far as
+pure geometry can: a link *with text* is presumed sized by its text and is
+exempt (flagging prose links would fire on every paragraph — a check that
+cries wolf gets ignored, taking the real findings with it). An icon link —
+an `<a>` wrapping an `<svg>`, no text — stays flagged. A producer with DOM
+access can compute the exception *properly* (computed display + parent text
+nodes) and ship the finding via `flags`; a producer flag whose `kind`
+mentions `target` **supersedes** the built-in audit, so the two never
+double-mark.
 
 Captions tell the truth in priority order: a held **value** wins (as
 `label: value` when both are known), an empty control falls back to its

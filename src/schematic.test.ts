@@ -652,3 +652,86 @@ describe('the haltija convergence — ref, flags, image, wrapping (0.2.0)', () =
     expect(shortLine).not.toContain('<tspan')
   })
 })
+
+describe('the legend convergence — href, value, the inline exception (0.3.0)', () => {
+  const at = (x: number, y: number, width = 160, height = 24) => ({ x, y, width, height })
+
+  test('href: a nameless link captions with its destination; a named one keeps its name', () => {
+    const map: SchematicDescription = {
+      wiring: [
+        { tag: 'a', href: '/docs', on: { click: 'ƒ' }, bounds: at(10, 10) },
+        { tag: 'a', text: 'read the docs', href: '/docs', on: { click: 'ƒ' }, bounds: at(10, 40) },
+      ],
+    }
+    const svg = schematicSVG(map)
+    expect(svg).toContain('>/docs</text>') // the sidebar case: no longer an empty box
+    expect(svg).toContain('read the docs') // a name, when present, wins
+  })
+
+  test('href always rides the legend — the destination is what an agent acts on', () => {
+    const { legend } = schematic({
+      wiring: [
+        { tag: 'a', text: 'home', href: 'https://example.com/a/very/long/path', on: { click: 'ƒ' }, bounds: at(10, 10) },
+      ],
+    })
+    expect(legend.length).toBe(1)
+    expect(legend[0].href).toBe('https://example.com/a/very/long/path')
+  })
+
+  test('value: a cramped input carries its held value into the legend', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        { tag: 'input', label: 'qty', value: '3 ⟷ app.qty', bounds: at(10, 10, 30, 12) },
+      ],
+    })
+    expect(svg).not.toContain('qty') // too cramped to caption
+    expect(legend.length).toBe(1)
+    expect(legend[0].caption).toBe('qty: 3')
+    expect(legend[0].value).toBe('3') // provenance stripped
+  })
+
+  test('inline exception: a text-sized link is not flagged undersized; an icon link is', () => {
+    const { legend } = schematic({
+      wiring: [
+        // a link in prose: sized by its text — WCAG 2.5.8 exempts it
+        { tag: 'a', text: 'terms', href: '/terms', on: { click: 'ƒ' }, bounds: at(10, 10, 34, 16) },
+        // an icon link (an <a> wrapping an <svg>, no text): flagged
+        { tag: 'a', label: 'settings', href: '/settings', on: { click: 'ƒ' }, bounds: at(60, 10, 16, 16) },
+      ],
+    })
+    const undersized = legend.filter((entry) => entry.undersized != null)
+    expect(undersized.length).toBe(1)
+    expect(undersized[0].href).toBe('/settings')
+  })
+
+  test('a producer-supplied target flag supersedes the built-in audit — no double bars', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        {
+          tag: 'button',
+          text: 'go',
+          flags: [{ kind: 'smallTarget', label: '16x16 (WCAG 2.5.8 needs 24x24)', severity: 'warn' }],
+          bounds: at(10, 10, 60, 16), // roomy enough to caption, short enough to flag
+        },
+      ],
+    })
+    expect(svg).toContain('data-flag="smallTarget"') // the producer's finding draws
+    expect(svg).not.toContain('data-flag="target-size"') // the built-in stands down
+    expect(legend.length).toBe(0) // nothing elided — the drawn bar says it all
+  })
+
+  test('a fully-wrapped caption is not falsely reported truncated', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        {
+          tag: 'p',
+          text: 'the quick brown fox jumps over the lazy dog',
+          bounds: at(10, 10, 200, 60), // wraps to two lines, all text drawn
+        },
+      ],
+    })
+    expect(svg).toContain('<tspan') // it did wrap
+    expect(legend.length).toBe(0) // nothing was elided — no entry, no footer
+    expect(svg).not.toContain('details in legend')
+  })
+})

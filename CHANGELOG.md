@@ -28,6 +28,33 @@ All notable changes to **tosijs-schematic** are documented here
 - Truncated captions (`…`) place their full text in the legend; the invalid
   corner-flag now shrinks to fit tiny boxes.
 
+### Added — href and value find their home (issue #1, haltija's request)
+
+- **`href?: string`** — a link's destination, distinct from its text
+  ("says X" is not "goes to Y"). Captions fall back to it only when nothing
+  else names the element (the nameless-sidebar case); it *always* rides the
+  legend — URLs are the facts most often too long to draw.
+- **`value?: string`** — a filled control's value as a declared field
+  (tosijs already carried it as a bound prop; plain-DOM producers now have
+  the same home). A cramped or truncated control's held value lands in its
+  legend entry, provenance stripped.
+
+### Changed — the target-size audit learns the inline exception
+
+- A link **with text** is presumed sized by its text and exempt from the
+  built-in audit (WCAG 2.5.8's inline exception, approximated as far as
+  pure geometry allows — flagging prose links fires on every paragraph and
+  the check gets ignored). Icon links (no text) stay flagged.
+- A producer-supplied flag whose `kind` mentions `target` **supersedes**
+  the built-in audit — producers with DOM access compute the exception
+  properly; no double amber bars for one finding.
+
+### Fixed
+
+- Fully-wrapped multi-line captions were falsely reported truncated (the
+  per-line character count lost the break spaces), forcing a stamp and a
+  legend entry onto every wrapped paragraph.
+
 ## [0.2.0] - 2026-08-08
 
 ### Added — the haltija convergence (issue #1)
