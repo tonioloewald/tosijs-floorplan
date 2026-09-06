@@ -1,0 +1,76 @@
+# tosijs-floorplan
+
+> Render an agent-surface map — plain records describing a UI's wired
+> elements — as a floorplan SVG wearing an explicit affordance grammar, so
+> "can I act here?" never needs guessing. A pure function over plain data:
+> no DOM, no framework, zero dependencies. Formerly `tosijs-schematic`
+> (renamed at 0.3.0; the exported API keeps its schematic-* names).
+
+Install: `npm add tosijs-floorplan`
+
+## Core API (all exported from the package root)
+
+- `schematic(description, options?)` → `{ svg, legend }` — the primary
+  form. The legend carries what the drawing could not legibly hold
+  (cramped/truncated/undersized records), keyed by index/ref. **Pair every
+  raster with its legend** — the image says *where and which*; the legend
+  says *what*.
+- `schematicSVG(description, options?)` → `string` — just the svg; each
+  `<g>` carries `data-record="<i>"` indexing back into
+  `description.wiring[i]`.
+- `rasterizeSVG(svg, {scale})` → PNG Blob for vision encoders (browser
+  canvas; under bun/node use `@resvg/resvg-js`; rasterize at 2×).
+- `boundsOf(element)` — an element's page-coordinate bounds (the natural
+  `within` argument). The only browser-touching exports are these two;
+  everything else runs anywhere JSON does.
+- `BOUND_TO_DOM` (`⟵`, display binding) and `BOUND_TWO_WAY` (`⟷`,
+  user-writable) — the provenance tokens found inside bound value strings
+  (`"<shown> <arrow> <path>"`).
+
+Options: `pad`, `minLabelHeight`, `maxCaption`, `fontSize`, `within`
+(page-coordinate rect: spatial scoping — the viewBox IS the region),
+`index: true` (stamp record indexes), `targetSize` (undersized-audit
+floor: 24 default per WCAG 2.5.8, 44/48 for touch, 0 off),
+`legendNote: false`, `decorate` (EXPERIMENTAL per-record plugin seam).
+
+## The record format (multi-producer contract)
+
+One flat record per wired element: `tag` (required), `bounds`
+({x,y,width,height} — zero-size or absent = not drawn), `label`
+(accessible name), `placeholder` (hint — never conflated with content),
+`text`, `value`, `href`, `type`, `checked`, `focused`, `invalid`,
+`required`, `disabled`, `contentEditable`, `on` (handlers by event type),
+`list`, `structural`, `viewportFixed`, `style`, `ref` (durable actionable
+handle), `flags` (computed verdicts, e.g. contrast), `image` (data-URL
+media snapshot), `id`, `part`, `role`, `description`. Bound props ride as
+`"value ⟷ path"` strings. Producers: tosijs `describe()` (reference),
+haltija DOM extraction. The full field table and grammar legend live in
+the README — it is the format specification. Field semantics changes
+require producer sign-off; additive optional fields are fine.
+
+## The affordance grammar (what the drawing means)
+
+Bold outline = wired to act; `↔` badge = editable here; faded = disabled
+(beats bold); double outline = keyboard focus; faint dotted = structure
+and list containers (ground, not figure); italic caption = placeholder
+hint; `*` = required; red corner flag = invalid now; `✕`/dot = live
+toggle state drawn as geometry; left-edge bars = producer flags and the
+target-size audit; top-right number/ref on white = the raster's index
+into the wiring. Everything is geometry or ASCII — rare glyphs tofu
+under rasterizers and never enter caption runs.
+
+## Docs
+
+- [README](https://github.com/tonioloewald/tosijs-floorplan/blob/main/README.md):
+  quick start, the full record-format specification, grammar table, API.
+- [CHANGELOG](https://github.com/tonioloewald/tosijs-floorplan/blob/main/CHANGELOG.md):
+  release history (Keep a Changelog).
+
+## Facts an agent should not have to rediscover
+
+- Output stability is a promise: unchanged input → unchanged SVG across
+  patch releases; consumers snapshot-test the output.
+- tosijs vendors `src/index.ts` verbatim (hence `src/` ships in the npm
+  tarball and the source stays one self-contained file).
+- `tosijs-schema` is a different package (JSON-schema validation); the
+  name similarity is acknowledged and deliberate history.
