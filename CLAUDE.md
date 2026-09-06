@@ -20,9 +20,15 @@ names deliberately: it is a multi-producer contract mid-adoption. Do not
 
 ```bash
 bun test           # the whole suite (pure fixtures, no DOM needed)
+bun test -t 'caption'  # one test, by name substring
 bun run build      # bun build (ESM) + tsc declarations into dist/
 npm publish        # prepublishOnly runs tests + build; publish is manual
 ```
+
+The suite lives beside the source (`src/schematic.test.ts` — there is no
+`test/` directory) and asserts on emitted SVG substrings, which is what
+enforces constraint 3 below: a deliberate output change means updating
+those assertions deliberately.
 
 ## Hard constraints — read before changing anything
 
