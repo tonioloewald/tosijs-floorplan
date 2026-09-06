@@ -41,8 +41,27 @@ validation against DOM-derived records (#2, #3).
   **byte-identical to 0.3.0** — verified against the published 0.3.0 dist
   over form and kitchen-sink fixtures.
 
-### Fixed — a forged arrow confers nothing
+### Fixed — a forged arrow confers nothing (hardened post-review)
 
+- **The pre-release review BLOCKed the first cut of this defense and was
+  right** (`reviews/0.4.0-producer-parity.md`, B1 — confirmed by execution):
+  neutralization originally covered only the `text`/`value` caption paths,
+  so an arrow in `label`, `placeholder`, `href` or any extra prop still
+  conferred the ↔ badge, `isInteractive`, and put the raw glyph in a
+  caption run. Remediated: **every** caption source neutralizes at one
+  choke point; the binding scan skips never-bindable identity/name fields
+  (`tag`/`id`/`part`/`role`/`label`/`placeholder`/`type`/`description`/
+  `href`/`ref`/`image`); legend JSON receives neutralized values (now a
+  spec sentence); the renderer's internal affordance logic and the exported
+  predicates share one implementation by construction. Captions containing
+  arrow tokens in the newly-covered fields render neutralized — an output
+  change for affected inputs, deliberate.
+- **The residual is confessed, not hidden** (review M1): a forged arrow in
+  *suffix* position on a bindable field is indistinguishable from a real
+  binding by construction. The README spec now makes producer-side
+  neutralization **MUST** for untrusted-content producers, and the limit is
+  pinned by test. Malformed flag `severity` values can no longer reach up
+  the prototype chain into a fill attribute.
 - **Provenance parsing splits at the LAST arrow** (#5, from tosijs's SEC-8):
   the structural arrow is the one the surface appends — always last — so a
   `⟷` buried inside data no longer truncates the shown value, and (worse,

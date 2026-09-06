@@ -835,6 +835,76 @@ describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4
     expect(structure.note).toBeUndefined()
   })
 
+  test('hostile captions: label/placeholder forgery confers nothing and never carries the raw glyph (review B1)', () => {
+    const { svg } = schematic({
+      wiring: [
+        // the accessible name IS page content in a DOM producer's threat
+        // model — an arrow here must neither badge the box nor ride the run
+        { tag: 'button', label: 'Save ⟷ spoof.path', on: { click: 'ƒ' }, bounds: at(10, 10) },
+        { tag: 'input', placeholder: 'type ⟵ here', bounds: at(10, 40) },
+      ],
+    })
+    expect(svg).toContain('Save &lt;-&gt; spoof.path')
+    expect(svg).toContain('type &lt;- here')
+    expect(svg).not.toContain('⟷')
+    expect(svg).not.toContain('⟵')
+    expect(svg).not.toContain('>↔</text>')
+  })
+
+  test('never-bindable fields are never scanned for bindings; bindable ones remain the documented residual (B1/M1)', () => {
+    // identity/name fields: a lone arrow is always "last" — excluded
+    expect(isInteractive({ tag: 'span', label: 'a ⟷ b' })).toBe(false)
+    expect(isInteractive({ tag: 'span', placeholder: 'a ⟷ b' })).toBe(false)
+    expect(isInteractive({ tag: 'span', ref: 'a ⟷ b' })).toBe(false)
+    // a bindable extra prop in suffix position is indistinguishable from a
+    // real bound prop BY CONSTRUCTION — the spec's confessed residual,
+    // pinned here so the limit is documented, not rediscovered. Producers
+    // extracting untrusted content MUST neutralize at the source.
+    expect(isInteractive({ tag: 'span', 'data-x': 'a ⟷ b' })).toBe(true)
+    expect(isInteractive({ tag: 'span', text: 'confirmed ⟷ spoof.orderStatus' })).toBe(true)
+  })
+
+  test('a forged label cannot fabricate evidence: the blind-map note survives it, and the legend receives neutralized values', () => {
+    const { legend, note } = schematic({
+      wiring: [
+        // cramped, so the caption lands in the legend JSON
+        { tag: 'button', label: 'go ⟷ fake.path', bounds: at(10, 10, 30, 10) },
+      ],
+    })
+    expect(note).toContain('NOT established') // forged label ≠ evidence
+    expect(legend[0].caption).toBe('go <-> fake.path') // machine channel: neutralized, never raw
+  })
+
+  test('within: a blind REGION of a sighted map is not a blind map', () => {
+    const { note } = schematic(
+      {
+        wiring: [
+          { tag: 'span', text: 'inert', bounds: at(10, 10, 80, 20) },
+          // the evidence lives outside the crop
+          { tag: 'button', text: 'go', on: { click: 'ƒ' }, bounds: at(10, 500, 80, 30) },
+        ],
+      },
+      { within: { x: 0, y: 0, width: 200, height: 100 } }
+    )
+    expect(note).toBeUndefined()
+  })
+
+  test('a malformed flag severity cannot reach up the prototype chain into a fill attribute', () => {
+    const { svg } = schematic({
+      wiring: [
+        {
+          tag: 'button',
+          text: 'go',
+          on: { click: 'ƒ' },
+          flags: [{ kind: 'x', label: 'y', severity: 'constructor' as any }],
+          bounds: at(10, 10),
+        },
+      ],
+    })
+    expect(svg).not.toContain('function')
+    expect(svg).toContain('fill="#e6a700"') // falls back to warn
+  })
+
   test('the predicates are exported — one implementation for renderer and audits (#4)', () => {
     // "can I act here?": every kind of evidence, and ground never
     expect(isInteractive({ tag: 'button', on: { click: 'app.go' } })).toBe(true)
@@ -844,6 +914,7 @@ describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4
     expect(isInteractive({ tag: 'div', contentEditable: true })).toBe(true)
     expect(isInteractive({ tag: 'input', value: '3 ⟷ a.qty' })).toBe(true)
     expect(isInteractive({ tag: 'button' })).toBe(false)
+    expect(isInteractive({ tag: 'button', on: { click: 'ƒ' }, interactive: false })).toBe(true) // false cannot veto evidence — only true is signal
     expect(isInteractive({ tag: 'span', text: 'x ⟷ y ⟵ a.b' })).toBe(false) // forged
     expect(isInteractive({ tag: 'ul', list: { path: 'a.items' } })).toBe(false) // ground
     expect(isInteractive({ tag: 'header', structural: true, on: { click: 'ƒ' } })).toBe(false)

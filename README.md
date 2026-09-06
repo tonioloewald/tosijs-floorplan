@@ -104,9 +104,17 @@ with no arrow is a live-but-unbound value. The **structural arrow is the
 LAST one in the string** — the surface appends it, so consumers must split
 at the last occurrence, and an arrow token buried inside the data confers
 nothing (the renderer parses defensively: it neutralizes interior arrows to
-`<->` / `<-` so they never ride a caption, and only an arrow in structural
-position reads as a binding). Producers should neutralize the tokens inside
-data at the source, as tosijs ≥ 1.8.0 does.
+`<->` / `<-` in every caption source and in the legend JSON — legend
+consumers receive neutralized values, never raw arrows — and never scans
+identity/name fields (`tag`, `id`, `part`, `role`, `label`, `placeholder`,
+`type`, `description`, `href`, `ref`, `image`) for bindings at all, since
+the surface never appends an arrow to those). **Producers whose record
+content derives from untrusted sources — any DOM extractor reading page
+content — MUST neutralize both tokens inside data at the source**, as
+tosijs ≥ 1.8.0 does. This is normative because of an honest residual: a
+forged arrow in *suffix* position on a bindable field (`"data ⟷ fake.path"`
+as the entire text) is structurally indistinguishable from a real binding —
+renderer-side defense ends where the format's own syntax begins.
 
 **Producers that cannot introspect handlers** (React's synthetic delegation,
 Angular's compiler output, vanilla `addEventListener` — none enumerable from
@@ -116,7 +124,14 @@ any evidence at all (no `on`, `href`, `contentEditable`, two-way binding, or
 assertion), the result carries a `note` — and the svg's `<desc>` repeats it —
 because "nothing here is actionable" and "the producer couldn't tell" are
 different statements, and a consumer must never mistake the second for the
-first.
+first. Two caveats pin the semantics: **partial evidence does not establish
+the rest** — on a map where some records carry evidence, a record without
+any still means *unknown*, not *inert* (the note only marks the total-blindness
+case; non-introspecting producers should assert per actable record, not rely
+on the note); and **only `interactive: true` / `editable: true` are signal** —
+`false` is indistinguishable from absent and cannot veto evidence the record
+itself carries (`on`, `href`, a binding). "Introspected and found nothing"
+currently has no encoding; propose one via issue before relying on it.
 
 **The picture is not the whole payload.** The renderer is *allowed to omit*:
 captions and badges below legibility thresholds move to the legend, keyed by

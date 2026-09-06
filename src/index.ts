@@ -201,9 +201,14 @@ export interface SchematicResult {
 const shownValue = (v: unknown): string | undefined => {
   if (typeof v !== 'string') return undefined
   const at = Math.max(v.lastIndexOf(BOUND_TWO_WAY), v.lastIndexOf(BOUND_TO_DOM))
-  const shown = at >= 0 ? v.slice(0, at).trim() : v
-  return shown.replaceAll(BOUND_TWO_WAY, '<->').replaceAll(BOUND_TO_DOM, '<-')
+  return neutralizeArrows(at >= 0 ? v.slice(0, at).trim() : v)
 }
+
+// arrow tokens inside record data must neither ride a caption run
+// (geometry over glyphs) nor read as structure — neutralized the same way
+// tosijs ≥1.8.0 does at the source
+const neutralizeArrows = (s: string): string =>
+  s.replaceAll(BOUND_TWO_WAY, '<->').replaceAll(BOUND_TO_DOM, '<-')
 
 // is this string a live two-way binding? Only the arrow in STRUCTURAL
 // position (last) counts — a ⟷ buried inside the data must not confer an
@@ -214,6 +219,32 @@ const boundTwoWay = (v: unknown): boolean => {
   const at = v.lastIndexOf(BOUND_TWO_WAY)
   return at >= 0 && at > v.lastIndexOf(BOUND_TO_DOM)
 }
+
+// fields the surface NEVER appends a binding arrow to: identity, naming,
+// hints, destinations. In these, any arrow is data (or forgery) — the
+// last-occurrence rule only protects fields that actually receive an
+// appended binding, so these are excluded from the binding scan entirely
+// (0.4.0 review B1: a lone forged arrow in a never-bindable field is
+// always in "last = structural" position).
+const NEVER_BOUND = new Set([
+  'tag', 'id', 'part', 'role', 'label', 'placeholder', 'type',
+  'description', 'href', 'ref', 'image',
+])
+const hasTwoWayBinding = (w: SchematicRecord): boolean =>
+  Object.entries(w).some(
+    ([key, v]) => !NEVER_BOUND.has(key) && boundTwoWay(v)
+  )
+
+// the two kinds of affordance evidence, split once and shared by the
+// renderer AND the exported predicate — three independently edited copies
+// of this logic is how the renderer and tosijs's audit drifted into
+// contradicting each other (issue #4); parity is now by construction
+const hasActEvidence = (w: SchematicRecord): boolean =>
+  w.on != null ||
+  w.interactive === true ||
+  (typeof w.href === 'string' && w.href !== '')
+const hasEditEvidence = (w: SchematicRecord): boolean =>
+  w.editable === true || w.contentEditable === true || hasTwoWayBinding(w)
 
 /**
  * An element's page-coordinate bounds (the same space describe() records) —
@@ -245,13 +276,11 @@ const isGround = (w: SchematicRecord): boolean =>
  * (structure, list containers) is never interactive.
  */
 export const isInteractive = (w: SchematicRecord): boolean =>
-  !isGround(w) &&
-  (w.interactive === true ||
-    w.editable === true ||
-    w.on != null ||
-    w.contentEditable === true ||
-    (typeof w.href === 'string' && w.href !== '') ||
-    Object.values(w).some(boundTwoWay))
+  !isGround(w) && (hasActEvidence(w) || hasEditEvidence(w))
+
+/** the WCAG 2.5.8 audit floor (24×24, the AA minimum) — one constant so
+ * the option default and the exported rule cannot drift */
+export const TARGET_SIZE_DEFAULT = 24
 
 /**
  * The WCAG 2.5.8 target-size rule, exported for the same reason as
@@ -271,7 +300,7 @@ export const isInteractive = (w: SchematicRecord): boolean =>
  */
 export const targetSizeFinding = (
   w: SchematicRecord,
-  targetSize = 24
+  targetSize = TARGET_SIZE_DEFAULT
 ): string | null => {
   if (targetSize <= 0 || w.bounds == null || !isInteractive(w)) return null
   if (w.type === 'checkbox' || w.type === 'radio') return null
@@ -324,6 +353,14 @@ const FLAG_COLORS: Record<string, string> = {
   info: '#888888',
 }
 
+// severity comes from producer JSON, so it can be anything — including
+// 'constructor', which a bare index would resolve up the prototype chain
+// into a function serialized straight into a fill attribute
+const flagColor = (severity: unknown): string =>
+  typeof severity === 'string' && Object.hasOwn(FLAG_COLORS, severity)
+    ? FLAG_COLORS[severity]
+    : FLAG_COLORS.warn
+
 // greedy word-wrap: captions should USE vertical room, not truncate with
 // space to spare (a <p> that wraps on the real page has the same height
 // here). Returns at most maxLines lines, each at most maxChars long;
@@ -368,7 +405,7 @@ export const schematic = (
     fontSize = 11,
     within,
     index: showIndex = false,
-    targetSize = 24,
+    targetSize = TARGET_SIZE_DEFAULT,
     legendNote = true,
     decorate,
   } = options
@@ -436,8 +473,11 @@ export const schematic = (
   // actionable" and "I couldn't tell" are different statements; when the
   // map draws non-ground boxes but not one record carries any evidence, the
   // result says so instead of letting silence claim the first.
+  // evidence is judged over the WHOLE wiring, not the drawn subset: a
+  // `within` crop of a map whose evidence lies outside the region is not a
+  // blind map, it's a blind REGION of a sighted one (review follow-up)
   const blind =
-    boxes.some((w) => !isGround(w)) && !boxes.some(isInteractive)
+    boxes.some((w) => !isGround(w)) && !description.wiring.some(isInteractive)
   const note = blind
     ? 'no record carries affordance evidence (on, href, contentEditable, ' +
       'a two-way binding, or an interactive/editable assertion) — ' +
@@ -507,21 +547,18 @@ export const schematic = (
           `<${w.tag}>`
       )
     }
+    // EVERY caption source (label, placeholder, href, tag fallback — not
+    // just the text/value paths shownValue serves) is neutralized here, at
+    // one choke point: the 0.4.0 review's B1 found the arrow defense
+    // bypassed by exactly the sources this line now covers
+    caption = neutralizeArrows(caption)
     const structural = isGround(w)
     // the affordance grammar, explicit: BOLD outline = wired to act —
     // handlers, a link destination (href: a link IS an affordance, 0.4.0),
     // or the producer's `interactive` word. The ↔ badge = editable here.
     // Solid = affordance, dotted = structure.
-    const actable =
-      !structural &&
-      (w.on != null ||
-        w.interactive === true ||
-        (typeof w.href === 'string' && w.href !== ''))
-    const editable =
-      !structural &&
-      (w.editable === true ||
-        w.contentEditable === true ||
-        Object.values(w).some(boundTwoWay))
+    const actable = !structural && hasActEvidence(w)
+    const editable = !structural && hasEditEvidence(w)
     const fill = structural
       ? 'none'
       : w.style != null
@@ -605,21 +642,20 @@ export const schematic = (
     // the LEFT edge — the unclaimed slot — plus the first flag's label
     if (!cramped && !structural && Array.isArray(w.flags) && w.flags.length > 0) {
       w.flags.forEach((flag, at) => {
-        const color = FLAG_COLORS[flag.severity ?? 'warn'] ?? FLAG_COLORS.warn
         parts.push(
           `<rect x="${x + at * 3}" y="${y}" width="3" height="${height}" ` +
-            `fill="${color}" data-flag="${esc(flag.kind)}"/>`
+            `fill="${flagColor(flag.severity)}" data-flag="${esc(flag.kind)}"/>`
         )
       })
       const first = w.flags[0]
       if (first.label && height >= minLabelHeight) {
-        const flagColor = FLAG_COLORS[first.severity ?? 'warn'] ?? FLAG_COLORS.warn
         parts.push(
           `<rect x="${x + w.flags.length * 3 + 1}" y="${y + height - 9}" ` +
             `width="${first.label.length * 4.5 + 2}" height="8" ` +
             `fill="white" opacity="0.85"/>`,
           `<text x="${x + w.flags.length * 3 + 2}" y="${y + height - 2}" ` +
-            `font-size="7" font-family="monospace" fill="${flagColor}">` +
+            `font-size="7" font-family="monospace" ` +
+            `fill="${flagColor(first.severity)}">` +
             `${esc(first.label)}</text>`
         )
       }
