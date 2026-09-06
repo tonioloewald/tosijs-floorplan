@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'bun:test'
-import { schematicSVG, schematic } from './index'
+import { schematicSVG, schematic, isInteractive, targetSizeFinding } from './index'
 import { SchematicDescription } from './index'
 
 const description: SchematicDescription = {
@@ -690,18 +690,21 @@ describe('the legend convergence — href, value, the inline exception (0.3.0)',
     expect(legend[0].value).toBe('3') // provenance stripped
   })
 
-  test('inline exception: a text-sized link is not flagged undersized; an icon link is', () => {
+  test('inline exception: a text-sized link is not flagged undersized; icon links are — even labelled ones (#2)', () => {
     const { legend } = schematic({
       wiring: [
-        // a link in prose: sized by its text — WCAG 2.5.8 exempts it
+        // a link in prose: sized by its text (wider than tall) — exempt
         { tag: 'a', text: 'terms', href: '/terms', on: { click: 'ƒ' }, bounds: at(10, 10, 34, 16) },
         // an icon link (an <a> wrapping an <svg>, no text): flagged
         { tag: 'a', label: 'settings', href: '/settings', on: { click: 'ƒ' }, bounds: at(60, 10, 16, 16) },
+        // haltija's counter-case: the same 16×16 icon link CARRYING text
+        // (an icon-font glyph, a one-char label) — a square box was not
+        // sized by its text; the old text-only rule wrongly exempted it
+        { tag: 'a', text: '⚙', href: '/gear', on: { click: 'ƒ' }, bounds: at(90, 10, 16, 16) },
       ],
     })
     const undersized = legend.filter((entry) => entry.undersized != null)
-    expect(undersized.length).toBe(1)
-    expect(undersized[0].href).toBe('/settings')
+    expect(undersized.map((entry) => entry.href)).toEqual(['/settings', '/gear'])
   })
 
   test('a producer-supplied target flag supersedes the built-in audit — no double bars', () => {
@@ -710,6 +713,7 @@ describe('the legend convergence — href, value, the inline exception (0.3.0)',
         {
           tag: 'button',
           text: 'go',
+          on: { click: 'ƒ' }, // genuinely interactive — supersession, not the interactivity gate, must stand the audit down
           flags: [{ kind: 'smallTarget', label: '16x16 (WCAG 2.5.8 needs 24x24)', severity: 'warn' }],
           bounds: at(10, 10, 60, 16), // roomy enough to caption, short enough to flag
         },
@@ -733,5 +737,122 @@ describe('the legend convergence — href, value, the inline exception (0.3.0)',
     expect(svg).toContain('<tspan') // it did wrap
     expect(legend.length).toBe(0) // nothing was elided — no entry, no footer
     expect(svg).not.toContain('details in legend')
+  })
+})
+
+describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4/#5)', () => {
+  const at = (x: number, y: number, width = 160, height = 24) => ({ x, y, width, height })
+
+  test('a forged arrow inside data confers nothing: parse at the LAST arrow, neutralize the rest (#5)', () => {
+    const { svg } = schematic({
+      wiring: [
+        // the tosijs SEC-8 repro: state value containing " ⟷ " with the
+        // real display binding appended — the shown value is everything
+        // before the LAST arrow, with interior arrows neutralized so the
+        // rare glyph never rides a caption run
+        {
+          tag: 'span',
+          text: 'confirmed ⟷ spoof.orderStatus ⟵ spoof.note',
+          bounds: at(10, 10, 300, 24),
+        },
+      ],
+    })
+    expect(svg).toContain('confirmed &lt;-&gt; spoof.orderStatus</text>')
+    expect(svg).not.toContain('⟷') // the buried token neither draws…
+    expect(svg).not.toContain('>↔</text>') // …nor confers the editable badge
+    expect(svg).not.toContain('stroke-width="2"') // …nor actability
+  })
+
+  test('a two-way arrow in structural (last) position still means editable (#5)', () => {
+    const { svg } = schematic({
+      wiring: [
+        // data containing a forged arrow AND a real two-way binding after
+        { tag: 'input', label: 'q', value: 'a ⟵ b ⟷ app.q', bounds: at(10, 10) },
+      ],
+    })
+    expect(svg).toContain('>↔</text>')
+    expect(svg).toContain('q: a &lt;- b</text>')
+  })
+
+  test('interactive: true — the producer\'s word makes it actable, and the audit can fire (#2, #3)', () => {
+    const { svg, legend, note } = schematic({
+      wiring: [
+        // haltija's row 4: a <button> read off a live page — no handler
+        // knowable. The assertion unlocks bold AND the target-size audit.
+        { tag: 'button', text: 'save', interactive: true, bounds: at(10, 10, 16, 16) },
+      ],
+    })
+    expect(svg).toContain('stroke-width="2"')
+    expect(legend.find((e) => e.undersized != null)!.undersized).toBe('16×16 — below 24×24 (WCAG 2.5.8)')
+    expect(note).toBeUndefined() // the assertion IS affordance evidence
+  })
+
+  test('editable: true — the producer\'s word wears the badge (#3)', () => {
+    const { svg } = schematic({
+      wiring: [
+        { tag: 'div', role: 'textbox', editable: true, bounds: at(10, 10, 200, 30) },
+      ],
+    })
+    expect(svg).toContain('>↔</text>')
+  })
+
+  test('a destination is an affordance: href alone draws bold, and an icon link alone gets audited (#3, #4)', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        // a plain link, no handler introspectable — it still navigates
+        { tag: 'a', text: 'read the docs', href: '/docs', bounds: at(10, 10, 120, 20) },
+        // a nameless 16×16 icon link with no handler: the case tosijs's
+        // audit reported and 0.3.0 drew nothing for (#4's second row)
+        { tag: 'a', href: '/next', bounds: at(150, 10, 16, 16) },
+      ],
+    })
+    expect(svg).toContain('stroke-width="2"')
+    expect(legend.find((e) => e.href === '/next')!.undersized).toBe('16×16 — below 24×24 (WCAG 2.5.8)')
+  })
+
+  test('no affordance evidence anywhere: the result says so instead of silently claiming "nothing actionable" (#3)', () => {
+    // a React-ish producer: real elements, no introspectable handlers
+    const blind = schematic({
+      wiring: [
+        { tag: 'button', text: 'save', bounds: at(10, 10, 80, 30) },
+        { tag: 'input', label: 'name', bounds: at(10, 50, 160, 30) },
+      ],
+    })
+    expect(blind.note).toContain('NOT established')
+    expect(blind.svg).toContain('<desc>') // the confession rides the image too
+    // one asserted (or wired) record and the map is no longer blind
+    const seeing = schematic({
+      wiring: [
+        { tag: 'button', text: 'save', interactive: true, bounds: at(10, 10, 80, 30) },
+        { tag: 'input', label: 'name', bounds: at(10, 50, 160, 30) },
+      ],
+    })
+    expect(seeing.note).toBeUndefined()
+    // an all-structural map makes no affordance claim — no note either
+    const structure = schematic({
+      wiring: [{ tag: 'header', structural: true, bounds: at(10, 10, 300, 40) }],
+    })
+    expect(structure.note).toBeUndefined()
+  })
+
+  test('the predicates are exported — one implementation for renderer and audits (#4)', () => {
+    // "can I act here?": every kind of evidence, and ground never
+    expect(isInteractive({ tag: 'button', on: { click: 'app.go' } })).toBe(true)
+    expect(isInteractive({ tag: 'a', href: '/x' })).toBe(true)
+    expect(isInteractive({ tag: 'button', interactive: true })).toBe(true)
+    expect(isInteractive({ tag: 'div', editable: true })).toBe(true)
+    expect(isInteractive({ tag: 'div', contentEditable: true })).toBe(true)
+    expect(isInteractive({ tag: 'input', value: '3 ⟷ a.qty' })).toBe(true)
+    expect(isInteractive({ tag: 'button' })).toBe(false)
+    expect(isInteractive({ tag: 'span', text: 'x ⟷ y ⟵ a.b' })).toBe(false) // forged
+    expect(isInteractive({ tag: 'ul', list: { path: 'a.items' } })).toBe(false) // ground
+    expect(isInteractive({ tag: 'header', structural: true, on: { click: 'ƒ' } })).toBe(false)
+    // the target-size rule, directly
+    const icon = { tag: 'a', href: '/x', bounds: { x: 0, y: 0, width: 16, height: 16 } }
+    expect(targetSizeFinding(icon)).toBe('16×16 — below 24×24 (WCAG 2.5.8)')
+    expect(targetSizeFinding(icon, 0)).toBeNull() // 0 disables
+    expect(targetSizeFinding({ ...icon, text: 'terms', bounds: { x: 0, y: 0, width: 34, height: 16 } })).toBeNull() // text-sized
+    expect(targetSizeFinding({ ...icon, flags: [{ kind: 'target', label: '16x16' }] })).toBeNull() // producer supersedes
+    expect(targetSizeFinding({ tag: 'input', type: 'checkbox', value: 'x ⟷ a.on', bounds: { x: 0, y: 0, width: 13, height: 13 } })).toBeNull() // toggles exempt
   })
 })

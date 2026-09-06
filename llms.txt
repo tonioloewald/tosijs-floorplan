@@ -10,11 +10,16 @@ Install: `npm add tosijs-floorplan`
 
 ## Core API (all exported from the package root)
 
-- `schematic(description, options?)` → `{ svg, legend }` — the primary
-  form. The legend carries what the drawing could not legibly hold
+- `schematic(description, options?)` → `{ svg, legend, note? }` — the
+  primary form. The legend carries what the drawing could not legibly hold
   (cramped/truncated/undersized records), keyed by index/ref. **Pair every
   raster with its legend** — the image says *where and which*; the legend
-  says *what*.
+  says *what*. `note` is set when no record carries affordance evidence:
+  "nothing actionable" is then NOT established.
+- `isInteractive(record)` / `targetSizeFinding(record, targetSize?)` — the
+  shared predicates: "can I act here?" and the WCAG 2.5.8 target-size rule
+  (with toggle, text-sized-link and producer-flag exemptions). Audits
+  should consume these rather than reimplement them.
 - `schematicSVG(description, options?)` → `string` — just the svg; each
   `<g>` carries `data-record="<i>"` indexing back into
   `description.wiring[i]`.
@@ -39,18 +44,22 @@ One flat record per wired element: `tag` (required), `bounds`
 ({x,y,width,height} — zero-size or absent = not drawn), `label`
 (accessible name), `placeholder` (hint — never conflated with content),
 `text`, `value`, `href`, `type`, `checked`, `focused`, `invalid`,
-`required`, `disabled`, `contentEditable`, `on` (handlers by event type),
-`list`, `structural`, `viewportFixed`, `style`, `ref` (durable actionable
-handle), `flags` (computed verdicts, e.g. contrast), `image` (data-URL
-media snapshot), `id`, `part`, `role`, `description`. Bound props ride as
-`"value ⟷ path"` strings. Producers: tosijs `describe()` (reference),
+`required`, `disabled`, `contentEditable`, `interactive` and `editable`
+(the producer's affordance ASSERTIONS — for producers that cannot
+introspect handlers, e.g. React/vanilla DOM), `on` (handlers by event
+type), `list`, `structural`, `viewportFixed`, `style`, `ref` (durable
+actionable handle), `flags` (computed verdicts, e.g. contrast), `image`
+(data-URL media snapshot), `id`, `part`, `role`, `description`. Bound
+props ride as `"value ⟷ path"` strings; the structural arrow is the LAST
+occurrence — arrows buried in data confer nothing. Producers: tosijs `describe()` (reference),
 haltija DOM extraction. The full field table and grammar legend live in
 the README — it is the format specification. Field semantics changes
 require producer sign-off; additive optional fields are fine.
 
 ## The affordance grammar (what the drawing means)
 
-Bold outline = wired to act; `↔` badge = editable here; faded = disabled
+Bold outline = wired to act (handlers, `href`, or the producer's
+`interactive` word); `↔` badge = editable here; faded = disabled
 (beats bold); double outline = keyboard focus; faint dotted = structure
 and list containers (ground, not figure); italic caption = placeholder
 hint; `*` = required; red corner flag = invalid now; `✕`/dot = live

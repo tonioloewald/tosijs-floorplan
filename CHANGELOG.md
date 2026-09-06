@@ -4,6 +4,54 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [0.4.0] - 2026-09-06
+
+The producer-parity release: everything here came from the two consumers
+reading 0.3.0 closely — tosijs's 1.8.0 review (#4, #5) and haltija's
+validation against DOM-derived records (#2, #3).
+
+### Added — the producer's word counts
+
+- **`interactive` / `editable` record fields** (#2, #3): the producer's
+  *assertion* of affordance, for producers that cannot introspect handlers
+  (React delegates at a root; vanilla `addEventListener` is not enumerable
+  from page script). Asserting is truth-telling; fabricating `on` to unlock
+  the styling would be a lie in the payload. tosijs never needs them.
+- **`isInteractive` and `targetSizeFinding` exported** (#4): tosijs's audit
+  and this renderer had drifted into contradictory verdicts on the same
+  element; now there is one implementation, living where the geometry lives.
+- **`schematic().note` + `<desc>` confession** (#3): when a map draws
+  affordance-shaped boxes but *no* record carries any affordance evidence,
+  the result says so — "nothing here is actionable" and "the producer
+  couldn't tell" are different statements, and silence was claiming the
+  first.
+
+### Changed — emitted SVG changes for some unchanged inputs (deliberate)
+
+- **A destination is an affordance**: `href` now makes a record actable
+  (bold outline) and interactive (target-size audit) — a link navigates,
+  handlers or no. Previously a plain `<a href>` drew as inert (#3, #4).
+- **The inline exception narrows** (#2): a link is text-size-exempt only
+  when it has text *and* its box is wider than tall — the shape text layout
+  produces. The old text-only rule exempted a 16×16 icon link the moment it
+  carried a glyph or one-word label: exactly the header-row-of-icon-links
+  case the check was built for. Square icon links now flag, labelled or not.
+- Maps with **none** of the new constructs (no bare-href links, no forged
+  arrows, no assertions, at least one evidence-bearing record) render
+  **byte-identical to 0.3.0** — verified against the published 0.3.0 dist
+  over form and kitchen-sink fixtures.
+
+### Fixed — a forged arrow confers nothing
+
+- **Provenance parsing splits at the LAST arrow** (#5, from tosijs's SEC-8):
+  the structural arrow is the one the surface appends — always last — so a
+  `⟷` buried inside data no longer truncates the shown value, and (worse,
+  before) no longer dressed a non-interactive element in the `↔` badge and
+  bold outline: a drawing that lies about what the page can do. Interior
+  arrow tokens are neutralized (`<->` / `<-`) so the rare glyph never rides
+  a caption run. The README now specifies last-occurrence parsing for all
+  consumers, matching tosijs ≥ 1.8.0's producer-side neutralization.
+
 ## [0.3.0] - 2026-08-09
 
 ### Renamed — tosijs-schematic → tosijs-floorplan

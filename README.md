@@ -88,6 +88,8 @@ One flat record per wired element. Producers may add fields beyond these —
 | `required` | `boolean` | the field is required |
 | `disabled` | `boolean` | disabled right now |
 | `contentEditable` | `boolean` | an editable region — treated as an input field |
+| `interactive` | `boolean` | the producer's **assertion** that this element can be acted on — for producers that cannot introspect handlers (React delegates at a root; vanilla `addEventListener` is not enumerable from page script). Asserting is truth-telling; fabricating `on` to unlock the styling would be a lie in the payload. A binding framework never needs it |
+| `editable` | `boolean` | the producer's assertion that text goes in here — the DOM-side counterpart of `contentEditable` / a two-way binding |
 | `on` | `Record<string, string \| string[]>` | handlers by event type — a path when nameable, `ƒ` (or `ƒ name`) when not |
 | `list` | `{path, idPath?}` | this element renders a collection (drawn as *ground*, not figure) |
 | `structural` | `boolean` | structure, not affordance (headings, landmarks, containers) |
@@ -98,7 +100,23 @@ One flat record per wired element. Producers may add fields beyond these —
 **Provenance tokens** (exported as `BOUND_TO_DOM` / `BOUND_TWO_WAY`): a bound
 value reads `"<shown> <arrow> <path>"` — `⟵` means state flows to the DOM
 (display), `⟷` means two-way (a user-writable affordance). A plain string
-with no arrow is a live-but-unbound value.
+with no arrow is a live-but-unbound value. The **structural arrow is the
+LAST one in the string** — the surface appends it, so consumers must split
+at the last occurrence, and an arrow token buried inside the data confers
+nothing (the renderer parses defensively: it neutralizes interior arrows to
+`<->` / `<-` so they never ride a caption, and only an arrow in structural
+position reads as a binding). Producers should neutralize the tokens inside
+data at the source, as tosijs ≥ 1.8.0 does.
+
+**Producers that cannot introspect handlers** (React's synthetic delegation,
+Angular's compiler output, vanilla `addEventListener` — none enumerable from
+page script) assert the affordance instead: `interactive` / `editable`, per
+record. When a map draws affordance-shaped boxes but **no** record carries
+any evidence at all (no `on`, `href`, `contentEditable`, two-way binding, or
+assertion), the result carries a `note` — and the svg's `<desc>` repeats it —
+because "nothing here is actionable" and "the producer couldn't tell" are
+different statements, and a consumer must never mistake the second for the
+first.
 
 **The picture is not the whole payload.** The renderer is *allowed to omit*:
 captions and badges below legibility thresholds move to the legend, keyed by
@@ -115,7 +133,7 @@ checkbox sizes.
 
 | you see | it means |
 | --- | --- |
-| **bold outline** | wired to act (has handlers) |
+| **bold outline** | wired to act — handlers, a destination (`href`: a link IS an affordance), or the producer's `interactive` assertion |
 | `↔` badge, bottom-right | editable here (two-way binding, or contenteditable) |
 | caption ending `*` | required |
 | **red corner flag**, top-left | invalid *right now* — live ValidityState, the same truth `:invalid` styles |
@@ -133,14 +151,20 @@ checkbox sizes.
 | footer strip: "N elements with details in legend" | the image's confession that it isn't the whole map — fetch `schematic().legend` (a machine-readable `<desc>` says the same) |
 
 The target-size audit honours WCAG 2.5.8's **inline exception** as far as
-pure geometry can: a link *with text* is presumed sized by its text and is
-exempt (flagging prose links would fire on every paragraph — a check that
-cries wolf gets ignored, taking the real findings with it). An icon link —
-an `<a>` wrapping an `<svg>`, no text — stays flagged. A producer with DOM
-access can compute the exception *properly* (computed display + parent text
-nodes) and ship the finding via `flags`; a producer flag whose `kind`
-mentions `target` **supersedes** the built-in audit, so the two never
-double-mark.
+pure geometry can: a link is exempt when it has text **and its box is wider
+than tall** — the shape text layout produces (flagging prose links would
+fire on every paragraph — a check that cries wolf gets ignored, taking the
+real findings with it). Icon links stay flagged: an `<a>` wrapping an
+`<svg>` with no text, and equally a **square** icon link that happens to
+carry a label or a glyph — a 16×16 box was not sized by its text, whatever
+the text is (the text-only rule exempted exactly the header-row-of-icons
+case the check was built for; haltija's issue #2 caught it). A producer
+with DOM access computes the exception *properly* (computed display +
+parent text nodes) and ships the finding via `flags` — that is the
+**intended path** for DOM producers; a producer flag whose `kind` mentions
+`target` **supersedes** the built-in audit, so the two never double-mark.
+Both rules are exported (`isInteractive`, `targetSizeFinding`) so audits
+share this implementation instead of keeping a drifting copy.
 
 Captions tell the truth in priority order: a held **value** wins (as
 `label: value` when both are known), an empty control falls back to its
@@ -154,8 +178,10 @@ geometry genuinely runs out.
 
 | export | what |
 | --- | --- |
-| `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend }`: the drawing plus the metadata it could not legibly carry (cramped/truncated/undersized records), keyed by index/ref. **Pair every raster with its legend.** |
+| `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend, note? }`: the drawing, the metadata it could not legibly carry (cramped/truncated/undersized records, keyed by index/ref), and — when no record carries affordance evidence — the note saying so. **Pair every raster with its legend.** |
 | `schematicSVG(description, options?)` | `schematic().svg` — the string-only form; each `<g>` carries `data-record="<i>"` linking back to `description.wiring[i]` (the image as index) |
+| `isInteractive(record)` | "can I act here?" — the single implementation (handlers, `href`, `contentEditable`, a structural two-way binding, or the producer's assertion; ground never). Exported so audits consume it instead of keeping a drifting copy |
+| `targetSizeFinding(record, targetSize?)` | the WCAG 2.5.8 rule with the settled exemptions (toggles, text-sized links, producer-flag supersession) — the measured legend fact, or `null` |
 | `rasterizeSVG(svg, {scale})` | SVG → PNG Blob for vision encoders (browser canvas; under bun/node use `@resvg/resvg-js` — rasterize at 2× so labels OCR cleanly) |
 | `boundsOf(element)` | an element's page-coordinate bounds — the natural `within` argument |
 | `BOUND_TO_DOM`, `BOUND_TWO_WAY` | the provenance tokens |

@@ -69,6 +69,16 @@ export interface SchematicRecord {
    * ("3") or bound ("3 ⟷ app.qty"). tosijs emits it as a bound prop; the
    * declared field gives plain-DOM producers the same home */
   value?: string
+  /** the producer's ASSERTION that this element can be acted on — for
+   * producers that cannot introspect handlers (React delegates at a root;
+   * vanilla addEventListener is not enumerable from page script). A binding
+   * framework never needs it: `on` and two-way bindings already say so.
+   * Asserting is truth-telling; fabricating `on` to unlock the styling
+   * would be a lie in the payload. (issue #3, haltija) */
+  interactive?: boolean
+  /** the producer's assertion that text goes in here — the DOM-side
+   * counterpart of contentEditable/two-way bindings (issue #3) */
+  editable?: boolean
   [boundProp: string]: unknown
 }
 
@@ -170,18 +180,39 @@ export interface SchematicLegendEntry {
 export interface SchematicResult {
   svg: string
   legend: SchematicLegendEntry[]
+  /** set when the map draws affordance-shaped boxes but NO record carries
+   * any affordance evidence: "nothing here is actionable" and "the
+   * producer couldn't tell" are different statements, and a consumer
+   * acting on the first when the truth is the second is the
+   * confident-wrong-answer case (issue #3). Also rides the svg's <desc>. */
+  note?: string
 }
 
 // strip provenance from a bound-value string: "shown ⟷ path" → "shown"
 // (empty when the binding holds no value yet); a plain string (no arrow)
-// is a live-but-unbound value and passes through whole
+// is a live-but-unbound value and passes through whole.
+// The STRUCTURAL arrow is the LAST one in the string — the surface appends
+// it, so everything before it is data, and data can carry arrow tokens
+// (forged, or from a producer older than tosijs 1.8.0, which neutralizes
+// them at the source). A renderer consumes maps it did not generate, so it
+// parses defensively: split at the last arrow, and neutralize any arrow
+// left INSIDE the shown value (geometry over glyphs — a rare glyph must
+// never ride a caption run, and a fake arrow must never read as structure).
 const shownValue = (v: unknown): string | undefined => {
   if (typeof v !== 'string') return undefined
-  for (const arrow of [BOUND_TWO_WAY, BOUND_TO_DOM]) {
-    const at = v.indexOf(arrow)
-    if (at >= 0) return v.slice(0, at).trim()
-  }
-  return v
+  const at = Math.max(v.lastIndexOf(BOUND_TWO_WAY), v.lastIndexOf(BOUND_TO_DOM))
+  const shown = at >= 0 ? v.slice(0, at).trim() : v
+  return shown.replaceAll(BOUND_TWO_WAY, '<->').replaceAll(BOUND_TO_DOM, '<-')
+}
+
+// is this string a live two-way binding? Only the arrow in STRUCTURAL
+// position (last) counts — a ⟷ buried inside the data must not confer an
+// affordance (a drawing that lies about what the page can do is worse than
+// no drawing).
+const boundTwoWay = (v: unknown): boolean => {
+  if (typeof v !== 'string') return false
+  const at = v.lastIndexOf(BOUND_TWO_WAY)
+  return at >= 0 && at > v.lastIndexOf(BOUND_TO_DOM)
 }
 
 /**
@@ -196,6 +227,72 @@ export const boundsOf = (element: Element): SchematicBounds => {
     width: Math.round(rect.width),
     height: Math.round(rect.height),
   }
+}
+
+// structure behind affordances — a LIST CONTAINER is ground too: it's
+// wired (the collection binds here), but its items are the affordances
+const isGround = (w: SchematicRecord): boolean =>
+  w.structural === true || (w.list != null && w.on == null)
+
+/**
+ * "Can I act here?" — the single implementation of the interactivity
+ * predicate, exported so audits (tosijs's auditAccessibility) consume THIS
+ * rather than keeping a drifting copy (issue #4: the two had already
+ * reached contradictory verdicts on the same element). Evidence, any of:
+ * handlers (`on`), a link destination (`href` — a link IS an affordance),
+ * `contentEditable`, a two-way binding in structural position, or the
+ * producer's own `interactive`/`editable` assertion (issue #3). Ground
+ * (structure, list containers) is never interactive.
+ */
+export const isInteractive = (w: SchematicRecord): boolean =>
+  !isGround(w) &&
+  (w.interactive === true ||
+    w.editable === true ||
+    w.on != null ||
+    w.contentEditable === true ||
+    (typeof w.href === 'string' && w.href !== '') ||
+    Object.values(w).some(boundTwoWay))
+
+/**
+ * The WCAG 2.5.8 target-size rule, exported for the same reason as
+ * `isInteractive` (issue #4): one implementation, geometry judged where the
+ * geometry lives. Returns the measured finding string (the legend fact) or
+ * null. Embodies the settled exemptions: toggles (user-agent-sized); links
+ * plausibly sized by VISIBLE text — the WCAG inline exception as far as
+ * pure geometry can honour it, which is: has text, and the box is WIDER
+ * than tall, the shape text layout produces (issue #2 caught the earlier
+ * text-only rule exempting 16×16 icon links that happened to carry a
+ * label; an accessible name alone never sizes a box, and a square box was
+ * not sized by its text); and supersession by any producer-supplied flag
+ * whose kind mentions `target` — a producer with DOM access (computed
+ * display, parent text nodes) computes the real exception and ships the
+ * finding via `flags`; that is the INTENDED path for DOM producers, and
+ * the built-in never double-marks over it.
+ */
+export const targetSizeFinding = (
+  w: SchematicRecord,
+  targetSize = 24
+): string | null => {
+  if (targetSize <= 0 || w.bounds == null || !isInteractive(w)) return null
+  if (w.type === 'checkbox' || w.type === 'radio') return null
+  if (
+    w.tag === 'a' &&
+    typeof w.text === 'string' &&
+    w.text !== '' &&
+    w.bounds.width > w.bounds.height
+  ) {
+    return null
+  }
+  if (
+    Array.isArray(w.flags) &&
+    w.flags.some((f) => f.kind.toLowerCase().includes('target'))
+  ) {
+    return null
+  }
+  const { width, height } = w.bounds
+  return width < targetSize || height < targetSize
+    ? `${width}×${height} — below ${targetSize}×${targetSize} (WCAG 2.5.8)`
+    : null
 }
 
 const intersects = (a: SchematicBounds, b: SchematicBounds): boolean =>
@@ -328,14 +425,26 @@ export const schematic = (
     } ${maxY - minY}" width="${maxX - minX}" height="${maxY - minY}">`,
   ]
   // structure behind affordances: dotted outlines the eye (and the raster)
-  // reads as grouping, not controls. A LIST CONTAINER is ground too — it's
-  // wired (the collection binds here, and the JSON record says so), but its
-  // items are the affordances; drawing it solid would read as actionable.
-  const ground = (w: (typeof boxes)[number]): boolean =>
-    w.structural === true || (w.list != null && w.on == null)
+  // reads as grouping, not controls (isGround, module level — the exported
+  // predicates share it).
   const drawOrder = [...boxes].sort(
-    (a, b) => Number(ground(b)) - Number(ground(a))
+    (a, b) => Number(isGround(b)) - Number(isGround(a))
   )
+  // NO AFFORDANCE EVIDENCE ANYWHERE: for a producer that cannot introspect
+  // handlers (issue #3), every record answers "can I act here?" with no —
+  // silently, which is the confident-wrong-answer failure. "Nothing here is
+  // actionable" and "I couldn't tell" are different statements; when the
+  // map draws non-ground boxes but not one record carries any evidence, the
+  // result says so instead of letting silence claim the first.
+  const blind =
+    boxes.some((w) => !isGround(w)) && !boxes.some(isInteractive)
+  const note = blind
+    ? 'no record carries affordance evidence (on, href, contentEditable, ' +
+      'a two-way binding, or an interactive/editable assertion) — ' +
+      '"nothing here is actionable" is NOT established; a producer that ' +
+      'cannot introspect handlers should assert `interactive`/`editable` ' +
+      'per record (see README)'
+    : undefined
   for (const w of drawOrder) {
     const index = description.wiring.indexOf(w)
     const pinOffsetX = w.viewportFixed === true ? minX + pad : 0
@@ -398,18 +507,21 @@ export const schematic = (
           `<${w.tag}>`
       )
     }
-    const structural = ground(w)
-    // the affordance grammar, explicit: BOLD outline = wired to act (has
-    // handlers); a trailing ⟷ on the caption = editable here (two-way
-    // binding), added when the caption is a label that would otherwise
-    // hide it. Solid = affordance, dotted = structure.
-    const actable = !structural && w.on != null
+    const structural = isGround(w)
+    // the affordance grammar, explicit: BOLD outline = wired to act —
+    // handlers, a link destination (href: a link IS an affordance, 0.4.0),
+    // or the producer's `interactive` word. The ↔ badge = editable here.
+    // Solid = affordance, dotted = structure.
+    const actable =
+      !structural &&
+      (w.on != null ||
+        w.interactive === true ||
+        (typeof w.href === 'string' && w.href !== ''))
     const editable =
       !structural &&
-      (w.contentEditable === true ||
-        Object.values(w).some(
-          (v) => typeof v === 'string' && v.includes(BOUND_TWO_WAY)
-        ))
+      (w.editable === true ||
+        w.contentEditable === true ||
+        Object.values(w).some(boundTwoWay))
     const fill = structural
       ? 'none'
       : w.style != null
@@ -432,35 +544,11 @@ export const schematic = (
       !structural && (height < minLabelHeight || width < fontSize * 3)
     // UNDERSIZED: an interactive element below the target-size floor is a
     // usability defect in its own right (WCAG 2.5.8: 24×24 AA; 44/48 is the
-    // platform touch bar) — toggles exempt as user-agent-sized controls
-    const interactive =
-      !structural &&
-      (w.on != null || w.contentEditable === true ||
-        Object.values(w).some(
-          (v) => typeof v === 'string' && v.includes(BOUND_TWO_WAY)
-        ))
-    // WCAG 2.5.8 exempts inline targets sized by their text — flagging
-    // prose links fires on every paragraph, and a check that cries wolf
-    // gets ignored, taking the real findings with it. A pure renderer
-    // can't see computed display, so: a link WITH text is presumed
-    // text-sized and exempt (icon links — an <a> wrapping an <svg>, no
-    // text — stay flagged). Producers with DOM access compute this
-    // properly and ship it via `flags`, which also SUPERSEDES the built-in
-    // audit here: no double amber bars for the same finding.
-    const producerTargetFlag =
-      Array.isArray(w.flags) &&
-      w.flags.some((f) => f.kind.toLowerCase().includes('target'))
-    const textSizedLink =
-      w.tag === 'a' && typeof w.text === 'string' && w.text !== ''
-    const undersized =
-      targetSize > 0 &&
-      interactive &&
-      !producerTargetFlag &&
-      !textSizedLink &&
-      !(w.type === 'checkbox' || w.type === 'radio') &&
-      (width < targetSize || height < targetSize)
-        ? `${width}×${height} — below ${targetSize}×${targetSize} (WCAG 2.5.8)`
-        : undefined
+    // platform touch bar). The whole rule — the interactivity predicate,
+    // the toggle and inline-link exemptions, producer-flag supersession —
+    // lives in the exported targetSizeFinding (issue #4: one
+    // implementation, shared with tosijs's audit).
+    const undersized = targetSizeFinding(w, targetSize)
     const emphasis = structural
       ? ' stroke-dasharray="1 3" stroke-linecap="round" opacity="0.45"'
       : w.disabled === true
@@ -711,20 +799,27 @@ export const schematic = (
         `details in legend — match by stamped number</text>`
     )
   }
+  const descBits: string[] = []
+  if (legend.length > 0) {
+    descBits.push(
+      `${description.wiring.length} records; ${legend.length} ` +
+        'legend entries carry metadata the drawing could not — pair this ' +
+        'image with its legend JSON (schematic().legend), matched by the ' +
+        'stamped number / data-record index.'
+    )
+  }
+  if (note != null) descBits.push(note)
   parts[0] =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${
       maxX - minX
     } ${maxY - minY + footerExtra}" width="${maxX - minX}" height="${
       maxY - minY + footerExtra
     }">` +
-    (legend.length > 0
-      ? `<desc>${description.wiring.length} records; ${legend.length} ` +
-        'legend entries carry metadata the drawing could not — pair this ' +
-        'image with its legend JSON (schematic().legend), matched by the ' +
-        'stamped number / data-record index.</desc>'
-      : '')
+    (descBits.length > 0 ? `<desc>${esc(descBits.join(' '))}</desc>` : '')
   parts.push('</svg>')
-  return { svg: parts.join(''), legend }
+  const result: SchematicResult = { svg: parts.join(''), legend }
+  if (note != null) result.note = note
+  return result
 }
 
 /** the string-only form — schematic().svg, kept for drop-in compatibility */
