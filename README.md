@@ -104,11 +104,17 @@ with no arrow is a live-but-unbound value. The **structural arrow is the
 LAST one in the string** — the surface appends it, so consumers must split
 at the last occurrence, and an arrow token buried inside the data confers
 nothing (the renderer parses defensively: it neutralizes interior arrows to
-`<->` / `<-` in every caption source and in the legend JSON — legend
-consumers receive neutralized values, never raw arrows — and never scans
+`<->` / `<-` in every drawn text run and in the legend's *display* fields —
+`caption` and `value` are always neutralized — and never scans
 identity/name fields (`tag`, `id`, `part`, `role`, `label`, `placeholder`,
 `type`, `description`, `href`, `ref`, `image`) for bindings at all, since
-the surface never appends an arrow to those). **Producers whose record
+the surface never appends an arrow to those). Two legend fields are
+**verbatim, deliberately**: `href` is an opaque destination — rewriting
+bytes inside a URL corrupts the one fact an agent acts on — and `flags`
+are copied as the producer computed them. Consumers must never parse
+provenance from either (they are in the never-scanned set; an arrow there
+is data), and must not forward them into a caption-style text run without
+neutralizing first. **Producers whose record
 content derives from untrusted sources — any DOM extractor reading page
 content — MUST neutralize both tokens inside data at the source**, as
 tosijs ≥ 1.8.0 does. This is normative because of an honest residual: a

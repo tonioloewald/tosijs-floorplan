@@ -28,6 +28,7 @@
     "build": "bun build src/index.ts --outdir dist --format esm && tsc -p tsconfig.json",
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit --emitDeclarationOnly false",
+    "stability": "bun tools/byte-stability.ts",
     "prepublishOnly": "bun test && bun run build"
   },
   "devDependencies": {

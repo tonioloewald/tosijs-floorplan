@@ -7,11 +7,15 @@
  *
  * Fixtures deliberately avoid constructs newer than the published version
  * (those are ALLOWED to differ; list them in EXPECTED_DIVERGENCE with the
- * changelog entry that licenses them). Run: `bun tools/byte-stability.ts`.
- * Not wired into prepublishOnly on purpose — it needs the network; run it
- * as part of the pre-tag review instead (release-doctor reports it).
+ * changelog entry that licenses them).
+ *
+ * WIRING: `bun run stability` — a MANDATORY pre-tag step, listed in
+ * CLAUDE.md's commands. It is NOT in prepublishOnly (it needs the network)
+ * and NOTHING runs it automatically — release-doctor has no project-local
+ * preflight seam (asking for one is tracked in TODO.md); until that
+ * exists, the human/agent cutting the tag runs this by hand.
  */
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -42,10 +46,23 @@ const FIXTURES: Record<string, object> = {
 const EXPECTED_DIVERGENCE: Record<string, string> = {}
 
 const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
+console.log(`working in ${dir}`)
 const pkg = (await import('../package.json')).default.name
-Bun.spawnSync(['npm', 'pack', `${pkg}@latest`, '--silent', '--pack-destination', dir])
+const packed = Bun.spawnSync(['npm', 'pack', `${pkg}@latest`, '--silent', '--pack-destination', dir])
 const tarball = [...new Bun.Glob('*.tgz').scanSync(dir)][0]
-Bun.spawnSync(['tar', 'xzf', join(dir, tarball), '-C', dir])
+if (packed.exitCode !== 0 || tarball == null) {
+  // a precondition failure is NOT a stability failure — say which it is
+  console.log(
+    `⏭️  could not fetch ${pkg}@latest (offline? registry down?) — ` +
+      'stability is UNVERIFIED, not passed; re-run online before tagging'
+  )
+  process.exit(1)
+}
+const untarred = Bun.spawnSync(['tar', 'xzf', join(dir, tarball), '-C', dir])
+if (untarred.exitCode !== 0) {
+  console.log(`⏭️  could not unpack ${tarball} — stability is UNVERIFIED, not passed`)
+  process.exit(1)
+}
 
 const published = await import(join(dir, 'package', 'dist', 'index.js'))
 const head = await import('../src/index.ts')
@@ -75,3 +92,4 @@ if (failed) {
   )
   process.exit(1)
 }
+rmSync(dir, { recursive: true, force: true })

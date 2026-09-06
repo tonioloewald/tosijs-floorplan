@@ -905,6 +905,32 @@ describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4
     expect(svg).toContain('fill="#e6a700"') // falls back to warn
   })
 
+  test('legend href is verbatim BY DESIGN — an opaque destination that confers nothing (round-2 G1)', () => {
+    const hostile = 'https://x.test/?q=a ⟷ fake.path'
+    const { svg, legend } = schematic({
+      wiring: [{ tag: 'a', href: hostile, on: { click: 'ƒ' }, bounds: at(10, 10) }],
+    })
+    // a URL's bytes ARE the destination — the legend must not rewrite them
+    expect(legend[0].href).toBe(hostile)
+    // …but the DRAWN side (caption falls back to href here) never carries
+    // the raw glyph, and the arrow inside the URL confers nothing
+    expect(svg).not.toContain('⟷')
+    expect(svg).not.toContain('>↔</text>')
+  })
+
+  test('a drawn flag label neutralizes; the legend copy of flags is verbatim (spec)', () => {
+    const flags = [{ kind: 'contrast', label: '2:1 ⟷ x', severity: 'error' as const }]
+    const { svg } = schematic({
+      wiring: [{ tag: 'button', text: 'go', on: { click: 'ƒ' }, flags, bounds: at(10, 10) }],
+    })
+    expect(svg).toContain('2:1 &lt;-&gt; x') // the run is display text — neutralized
+    expect(svg).not.toContain('⟷')
+    const cramped = schematic({
+      wiring: [{ tag: 'button', text: 'go', flags, interactive: true, bounds: at(10, 10, 30, 10) }],
+    })
+    expect(cramped.legend[0].flags![0].label).toBe('2:1 ⟷ x') // machine channel: as the producer computed it
+  })
+
   test('the predicates are exported — one implementation for renderer and audits (#4)', () => {
     // "can I act here?": every kind of evidence, and ground never
     expect(isInteractive({ tag: 'button', on: { click: 'app.go' } })).toBe(true)

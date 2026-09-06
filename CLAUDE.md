@@ -22,6 +22,10 @@ names deliberately: it is a multi-producer contract mid-adoption. Do not
 bun test           # the whole suite (pure fixtures, no DOM needed)
 bun test -t 'caption'  # one test, by name substring
 bun run build      # bun build (ESM) + tsc declarations into dist/
+bun run stability  # MANDATORY before tagging: renders fixtures through the
+                   # published dist vs HEAD, fails on unlicensed byte drift
+                   # (constraint 3's guard; needs network; nothing runs it
+                   # automatically)
 npm publish        # prepublishOnly runs tests + build; publish is manual
 ```
 

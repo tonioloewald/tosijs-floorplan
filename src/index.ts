@@ -656,7 +656,9 @@ export const schematic = (
           `<text x="${x + w.flags.length * 3 + 2}" y="${y + height - 2}" ` +
             `font-size="7" font-family="monospace" ` +
             `fill="${flagColor(first.severity)}">` +
-            `${esc(first.label)}</text>`
+            // the drawn label is a text RUN (neutralize: rare glyphs tofu);
+            // the legend's copy of flags stays verbatim, per the spec
+            `${esc(neutralizeArrows(first.label))}</text>`
         )
       }
     }

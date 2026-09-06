@@ -51,8 +51,10 @@ validation against DOM-derived records (#2, #3).
   caption run. Remediated: **every** caption source neutralizes at one
   choke point; the binding scan skips never-bindable identity/name fields
   (`tag`/`id`/`part`/`role`/`label`/`placeholder`/`type`/`description`/
-  `href`/`ref`/`image`); legend JSON receives neutralized values (now a
-  spec sentence); the renderer's internal affordance logic and the exported
+  `href`/`ref`/`image`); the legend's display fields (`caption`, `value`)
+  receive neutralized values, while `href` and `flags` are verbatim by
+  design — a URL's bytes are the destination (spec'd, with the consumer
+  obligation); the renderer's internal affordance logic and the exported
   predicates share one implementation by construction. Captions containing
   arrow tokens in the newly-covered fields render neutralized — an output
   change for affected inputs, deliberate.
@@ -61,7 +63,10 @@ validation against DOM-derived records (#2, #3).
   binding by construction. The README spec now makes producer-side
   neutralization **MUST** for untrusted-content producers, and the limit is
   pinned by test. Malformed flag `severity` values can no longer reach up
-  the prototype chain into a fill attribute.
+  the prototype chain into a fill attribute, and the drawn flag *label* run
+  neutralizes arrow tokens too (round-2 review; output changes only for
+  arrow-bearing flag labels, which no known producer emits — the legend's
+  copy of `flags` stays verbatim, as the spec states).
 - **Provenance parsing splits at the LAST arrow** (#5, from tosijs's SEC-8):
   the structural arrow is the one the surface appends — always last — so a
   `⟷` buried inside data no longer truncates the shown value, and (worse,
