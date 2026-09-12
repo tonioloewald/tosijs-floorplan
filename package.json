@@ -1,6 +1,6 @@
 {
   "name": "tosijs-floorplan",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Render an agent-surface map (plain records) as a floorplan SVG — the affordance grammar as a pure, dependency-free function. No DOM, no framework. Formerly tosijs-schematic.",
   "type": "module",
   "license": "Apache-2.0",

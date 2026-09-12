@@ -90,6 +90,7 @@ One flat record per wired element. Producers may add fields beyond these —
 | `contentEditable` | `boolean` | an editable region — treated as an input field |
 | `interactive` | `boolean` | the producer's **assertion** that this element can be acted on — for producers that cannot introspect handlers (React delegates at a root; vanilla `addEventListener` is not enumerable from page script). Asserting is truth-telling; fabricating `on` to unlock the styling would be a lie in the payload. A binding framework never needs it |
 | `editable` | `boolean` | the producer's assertion that text goes in here — the DOM-side counterpart of `contentEditable` / a two-way binding |
+| `secret` | `boolean` | the producer **withheld** facts about this element (a secret-marked region: a token lives in the destination, so neither `label` nor `href` is published). Draws a `<tag> [withheld]` caption when nothing else names it; the legend entry says `redacted: true` — "no destination" and "destination withheld" are different facts |
 | `on` | `Record<string, string \| string[]>` | handlers by event type — a path when nameable, `ƒ` (or `ƒ name`) when not |
 | `list` | `{path, idPath?}` | this element renders a collection (drawn as *ground*, not figure) |
 | `structural` | `boolean` | structure, not affordance (headings, landmarks, containers) |
@@ -120,14 +121,24 @@ content — MUST neutralize both tokens inside data at the source**, as
 tosijs ≥ 1.8.0 does. This is normative because of an honest residual: a
 forged arrow in *suffix* position on a bindable field (`"data ⟷ fake.path"`
 as the entire text) is structurally indistinguishable from a real binding —
-renderer-side defense ends where the format's own syntax begins.
+renderer-side defense ends where the format's own syntax begins. And the
+bindable set is **open by design** (bound props ride under their own keys),
+so the never-scanned list is a denylist over an open key set: any key a
+producer invents is bindable, and arrows in it are trusted as structure.
+The defense is narrowed, not closed — producer-side neutralization remains
+the actual perimeter (issue #11).
 
 **Producers that cannot introspect handlers** (React's synthetic delegation,
 Angular's compiler output, vanilla `addEventListener` — none enumerable from
 page script) assert the affordance instead: `interactive` / `editable`, per
 record. When a map draws affordance-shaped boxes but **no** record carries
-any evidence at all (no `on`, `href`, `contentEditable`, two-way binding, or
-assertion), the result carries a `note` — and the svg's `<desc>` repeats it —
+affordance evidence (no `on`, `href`, `contentEditable`, two-way binding, or
+assertion) **and none carries capability evidence either** — a handler, an
+assertion, or a provenance arrow in a bindable field *anywhere in the map*,
+display-only `⟵` included, proves the producer can see wiring (#10: a
+read-only dashboard from a binding framework is a sighted map of an inert
+page, not a blind map) — the result carries a `note`, and the svg's
+`<desc>` repeats it,
 because "nothing here is actionable" and "the producer couldn't tell" are
 different statements, and a consumer must never mistake the second for the
 first. Two caveats pin the semantics: **partial evidence does not establish
@@ -182,10 +193,19 @@ the text is (the text-only rule exempted exactly the header-row-of-icons
 case the check was built for; haltija's issue #2 caught it). A producer
 with DOM access computes the exception *properly* (computed display +
 parent text nodes) and ships the finding via `flags` — that is the
-**intended path** for DOM producers; a producer flag whose `kind` mentions
-`target` **supersedes** the built-in audit, so the two never double-mark.
-Both rules are exported (`isInteractive`, `targetSizeFinding`) so audits
-share this implementation instead of keeping a drifting copy.
+**intended path** for DOM producers. A producer flag whose `kind` is one
+of the **target-claim kinds** (`TARGET_FLAG_KINDS`, case-insensitive:
+`target`, `target-size`, `targetsize`, `target_size`, `smalltarget`)
+**supersedes** the drawn audit, so the two never double-mark — an explicit
+set, because a substring match let `target-ok` stand the audit down (#8).
+Supersession is a *drawing* concern and therefore **opt-in**:
+`targetSizeFinding` ignores producer flags by default (an audit wants the
+geometry verdict regardless of what got drawn); `schematic()` passes
+`honorProducerFlags: true`. Hidden is not small: zero-size records are
+never undersized (#9). Both rules are exported (`isInteractive`,
+`targetSizeFinding`) so audits share this implementation instead of
+keeping a drifting copy — and as of 0.5.0 they reproduce an audit's
+verdicts without consumer-side normalization (#7/#8/#9/#13).
 
 Captions tell the truth in priority order: a held **value** wins (as
 `label: value` when both are known), an empty control falls back to its
@@ -202,7 +222,8 @@ geometry genuinely runs out.
 | `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend, note? }`: the drawing, the metadata it could not legibly carry (cramped/truncated/undersized records, keyed by index/ref), and — when no record carries affordance evidence — the note saying so. **Pair every raster with its legend.** |
 | `schematicSVG(description, options?)` | `schematic().svg` — the string-only form; each `<g>` carries `data-record="<i>"` linking back to `description.wiring[i]` (the image as index) |
 | `isInteractive(record)` | "can I act here?" — the single implementation (handlers, `href`, `contentEditable`, a structural two-way binding, or the producer's assertion; ground never). Exported so audits consume it instead of keeping a drifting copy |
-| `targetSizeFinding(record, targetSize?)` | the WCAG 2.5.8 rule with the settled exemptions (toggles, text-sized links, producer-flag supersession) — the measured legend fact, or `null` |
+| `targetSizeFinding(record, targetSize?, {honorProducerFlags?})` | the WCAG 2.5.8 rule with the settled exemptions (toggles, text-sized links, zero-size; producer-flag supersession only when honoured — the renderer's setting, not an audit's) — the measured legend fact, or `null` |
+| `TARGET_FLAG_KINDS` | the flag kinds that claim to *be* a target-size finding and may supersede the drawn audit |
 | `rasterizeSVG(svg, {scale})` | SVG → PNG Blob for vision encoders (browser canvas; under bun/node use `@resvg/resvg-js` — rasterize at 2× so labels OCR cleanly) |
 | `boundsOf(element)` | an element's page-coordinate bounds — the natural `within` argument |
 | `BOUND_TO_DOM`, `BOUND_TWO_WAY` | the provenance tokens |

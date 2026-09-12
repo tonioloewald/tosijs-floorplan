@@ -16,10 +16,13 @@ Install: `npm add tosijs-floorplan`
   raster with its legend** — the image says *where and which*; the legend
   says *what*. `note` is set when no record carries affordance evidence:
   "nothing actionable" is then NOT established.
-- `isInteractive(record)` / `targetSizeFinding(record, targetSize?)` — the
+- `isInteractive(record)` /
+  `targetSizeFinding(record, targetSize?, {honorProducerFlags?})` — the
   shared predicates: "can I act here?" and the WCAG 2.5.8 target-size rule
-  (with toggle, text-sized-link and producer-flag exemptions). Audits
-  should consume these rather than reimplement them.
+  (toggle, text-sized-link and zero-size exemptions; producer-flag
+  supersession — kinds in `TARGET_FLAG_KINDS` — only when honoured, which
+  is the renderer's setting, not an audit's). Audits consume these rather
+  than reimplement them; they reproduce audit verdicts as of 0.5.0.
 - `schematicSVG(description, options?)` → `string` — just the svg; each
   `<g>` carries `data-record="<i>"` indexing back into
   `description.wiring[i]`.
@@ -46,7 +49,8 @@ One flat record per wired element: `tag` (required), `bounds`
 `text`, `value`, `href`, `type`, `checked`, `focused`, `invalid`,
 `required`, `disabled`, `contentEditable`, `interactive` and `editable`
 (the producer's affordance ASSERTIONS — for producers that cannot
-introspect handlers, e.g. React/vanilla DOM), `on` (handlers by event
+introspect handlers, e.g. React/vanilla DOM), `secret` (facts withheld —
+draws `[withheld]`, legend says `redacted`), `on` (handlers by event
 type), `list`, `structural`, `viewportFixed`, `style`, `ref` (durable
 actionable handle), `flags` (computed verdicts, e.g. contrast), `image`
 (data-URL media snapshot), `id`, `part`, `role`, `description`. Bound

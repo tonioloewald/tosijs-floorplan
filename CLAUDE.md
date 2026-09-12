@@ -58,6 +58,12 @@ those assertions deliberately.
    to 0.1.x. Treat any change to emitted SVG for an *unchanged* input as a
    semver-minor event at least, called out in the commit message, with the
    affected tests updated deliberately — never as incidental drift.
+   `bun run stability` is the mechanical guard. **Verdict changes get their
+   own CHANGELOG section** (issue #14, requested by tosijs which re-exports
+   the predicates): same input → different `isInteractive`/
+   `targetSizeFinding` answer is a public-behavior change for consumers even
+   when no API changed — name the record shapes affected, as 0.4.0 did for
+   `href`.
 
 4. **The record format is a multi-producer contract — not this repo's to
    change unilaterally.** Producers: tosijs's `describe()` (the reference

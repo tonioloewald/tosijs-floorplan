@@ -556,6 +556,82 @@ describe('decorate — the plugin seam', () => {
   })
 })
 
+describe('the 1.11.0 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => {
+  const at = (x: number, y: number, width = 160, height = 24) => ({ x, y, width, height })
+
+  test('evidence beats container role: a list-bound <select> that IS the control is an affordance (#7)', () => {
+    const select = {
+      tag: 'select',
+      list: { path: 'app.options', idPath: 'id' },
+      value: 'b ⟷ app.choice',
+      bounds: { x: 10, y: 10, width: 20, height: 20 },
+    }
+    expect(isInteractive(select)).toBe(true)
+    expect(targetSizeFinding(select)).toBe('20×20 — below 24×24 (WCAG 2.5.8)')
+    const { svg } = schematic({ wiring: [select] })
+    expect(svg).not.toContain('stroke-dasharray') // control, not ground
+    // …while a plain list container without evidence of its own stays ground
+    expect(isInteractive({ tag: 'ul', list: { path: 'a.items' } })).toBe(false)
+  })
+
+  test('supersession cannot be bought with a kind that merely mentions target (#8)', () => {
+    const tiny = { tag: 'button', on: { click: 'ƒ' }, bounds: { x: 0, y: 0, width: 10, height: 10 } }
+    const finding = '10×10 — below 24×24 (WCAG 2.5.8)'
+    // claims to BE a target-size finding: supersedes (when honoured)
+    for (const kind of ['target', 'target-size', 'smallTarget', 'TARGET_SIZE']) {
+      expect(targetSizeFinding({ ...tiny, flags: [{ kind, label: 'x' }] }, 24, { honorProducerFlags: true })).toBeNull()
+    }
+    // merely mentions the word: does not
+    for (const kind of ['target-ok', 'TARGETS ARE FINE', 'retargeting']) {
+      expect(targetSizeFinding({ ...tiny, flags: [{ kind, label: 'x' }] }, 24, { honorProducerFlags: true })).toBe(finding)
+    }
+  })
+
+  test('hidden is not small: zero-size records are not undersized (#9)', () => {
+    expect(targetSizeFinding({ tag: 'button', on: { click: 'ƒ' }, bounds: { x: 0, y: 0, width: 0, height: 0 } })).toBeNull()
+  })
+
+  test('capability evidence suppresses the blind-map note: a read-only dashboard is not a blind map (#10)', () => {
+    const dashboard = schematic({
+      wiring: [
+        { tag: 'span', text: '21°C ⟵ dash.temp', bounds: at(10, 10) },
+        { tag: 'span', text: '40% ⟵ dash.humidity', bounds: at(10, 40) },
+      ],
+    })
+    // display bindings prove the producer can see wiring — nothing here is
+    // actionable, and that IS established
+    expect(dashboard.note).toBeUndefined()
+  })
+
+  test('a flags entry without kind neither throws nor colors outside the lines (#12)', () => {
+    const record = {
+      tag: 'button',
+      on: { click: 'ƒ' },
+      label: 'Go',
+      flags: [{ label: 'x' }] as any,
+      bounds: { x: 0, y: 0, width: 10, height: 10 },
+    }
+    expect(targetSizeFinding(record, 24, { honorProducerFlags: true })).toBe('10×10 — below 24×24 (WCAG 2.5.8)')
+    const { svg } = schematic({ wiring: [{ ...record, bounds: at(10, 10) }] })
+    expect(svg).toContain('data-flag=""')
+  })
+
+  test('a redacted record draws its withholding, and the legend says so (#15)', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        // tosijs 1.11.0's secret-region shape: neither label nor href
+        { tag: 'a', secret: true, text: '⟵ s.name', on: { click: 'ƒ' }, bounds: at(10, 10) },
+        { tag: 'a', text: 'plain link', href: '/x', on: { click: 'ƒ' }, bounds: at(10, 40) },
+      ],
+    })
+    expect(svg).toContain('&lt;a&gt; [withheld]') // not an anonymous bare box
+    const entry = legend.find((e) => e.redacted)!
+    expect(entry.index).toBe(0)
+    expect(entry.href).toBeUndefined() // withheld, and the legend SAYS withheld
+    expect(legend.find((e) => e.index === 1)!.redacted).toBeUndefined()
+  })
+})
+
 describe('producer compatibility — interface-typed maps assign without casts', () => {
   test("a describe()-shaped interface flows straight in", () => {
     // mirrors tosijs's AgentDescription: an INTERFACE (no implicit index
@@ -949,7 +1025,10 @@ describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4
     expect(targetSizeFinding(icon)).toBe('16×16 — below 24×24 (WCAG 2.5.8)')
     expect(targetSizeFinding(icon, 0)).toBeNull() // 0 disables
     expect(targetSizeFinding({ ...icon, text: 'terms', bounds: { x: 0, y: 0, width: 34, height: 16 } })).toBeNull() // text-sized
-    expect(targetSizeFinding({ ...icon, flags: [{ kind: 'target', label: '16x16' }] })).toBeNull() // producer supersedes
+    // supersession is opt-in as of 0.5.0 (#8): the bare rule reports
+    // geometry truth; only the renderer (no double bars) passes true
+    expect(targetSizeFinding({ ...icon, flags: [{ kind: 'target', label: '16x16' }] })).toBe('16×16 — below 24×24 (WCAG 2.5.8)')
+    expect(targetSizeFinding({ ...icon, flags: [{ kind: 'target', label: '16x16' }] }, 24, { honorProducerFlags: true })).toBeNull()
     expect(targetSizeFinding({ tag: 'input', type: 'checkbox', value: 'x ⟷ a.on', bounds: { x: 0, y: 0, width: 13, height: 13 } })).toBeNull() // toggles exempt
   })
 })

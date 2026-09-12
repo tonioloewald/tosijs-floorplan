@@ -4,6 +4,62 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [0.5.0] - 2026-09-12
+
+The adoption-feedback release: all nine issues from tosijs 1.11.0's
+adoption of 0.4.0 (#7–#15), landed as one batch. The predicates now
+reproduce an audit's verdicts without consumer-side normalization,
+retiring tosijs's private `auditView` workaround (#13).
+
+### Verdict changes — same input, different answer (the section #14 asked for)
+
+- **List-bound elements with their own evidence are affordances** (#7): a
+  `<select>` carrying `list` *and* a two-way `value` (or handlers, or
+  assertions) is no longer ground — `isInteractive` true, drawn solid,
+  audited. Plain list containers without evidence are unchanged.
+- **`targetSizeFinding` ignores producer flags by default** (#8):
+  supersession is a drawing concern; `schematic()` opts in with
+  `honorProducerFlags: true`. Direct callers of the rule now get the
+  geometry verdict where they previously got `null` on flag-bearing
+  records.
+- **Supersession requires a target-claim kind** (#8): exported
+  `TARGET_FLAG_KINDS` (`target`, `target-size`, `targetsize`,
+  `target_size`, `smalltarget` — case-insensitive) replaces the substring
+  match that let `target-ok` stand the audit down. Covers both producers'
+  kinds in the wild.
+- **Zero-size records are never undersized** (#9): hidden is not small;
+  the guard callers were each rewriting is folded into the rule.
+- **The blind-map note respects capability evidence** (#10): any handler,
+  assertion, or provenance arrow in a bindable field anywhere in the map —
+  display-only `⟵` included — suppresses it. A read-only dashboard from a
+  binding framework no longer gets told to assert fields its producer
+  never emits.
+
+### Added
+
+- **`secret` record field + `redacted` legend fact** (#15, from tosijs
+  1.11.0's secret regions): a record whose facts were withheld draws a
+  `<tag> [withheld]` caption instead of an anonymous bare box, and its
+  legend entry says `redacted: true` — "no destination" and "destination
+  withheld" are different facts.
+- **`TARGET_FLAG_KINDS` exported**; `targetSizeFinding` gains the
+  `honorProducerFlags` option (#8/#13).
+
+### Fixed
+
+- **A `flags` entry without `kind` no longer throws** in either
+  `targetSizeFinding` or `schematic()` (#12) — `kind` gets the same
+  defense `severity` already had; it draws `data-flag=""`.
+
+### Documented
+
+- The forged-arrow residual now names the open-key-set limit explicitly
+  (#11): the never-scanned list is a denylist, bound props ride under
+  arbitrary keys, so producer-side neutralization remains the perimeter —
+  narrowed, not closed.
+- Verdict changes are a first-class CHANGELOG section by convention (#14),
+  recorded in CLAUDE.md.
+
 ## [0.4.0] - 2026-09-06
 
 The producer-parity release: everything here came from the two consumers
