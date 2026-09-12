@@ -21,9 +21,10 @@ here is the index; the issue is the conversation).
 ## tosijs
 
 - **[tosijs#40](https://github.com/tonioloewald/tosijs/issues/40)** —
-  re-vendor at 0.4.0+ (the remediated one, i.e. whatever `v0.4.0` points
-  at) and redirect `audit.ts` to the exported `isInteractive` /
-  `targetSizeFinding`, deleting the drifted copies. Closes the loop on
-  incoming issue #4; includes the exemption-behavior change their audit
-  adopts (visible text + wider-than-tall, not `label ?? text`).
-  Filed 2026-09-06.
+  re-vendor at the current release and redirect `audit.ts` to the
+  exported predicates. Filed 2026-09-06 against 0.4.0; **extended
+  2026-09-12 with 0.5.0 receipts**: scratch-clone dry-run (1033/1033 with
+  0.5.0 vendored; 29/29 audit tests with `auditView` neutered — the #13
+  retirement is executed fact) and the U3 changelog ask — tosijs must
+  name the `targetSizeFinding` `honorProducerFlags` default flip in its
+  own changelog, since third parties inherit it via the public re-export.

@@ -40,9 +40,13 @@ retiring tosijs's private `auditView` workaround (#13).
 - **`secret` record field + `redacted` legend fact, FAIL-CLOSED** (#15,
   from tosijs 1.11.0's secret regions; hardened by this release's review
   G1, which caught the first cut fail-open — republishing a magic-link
-  token while stamping `redacted: true` beside the leak): a secret
-  record's label/text/value/placeholder/href never reach the drawing or
-  the legend, even when a producer bug leaves them in the record. It
+  token while stamping `redacted: true` beside the leak — and whose
+  round-2 B1 caught the scrub missing `image`, the captured pixels being
+  the highest-bandwidth withholdable fact): a secret record's
+  label/text/value/placeholder/href/image never reach the drawing or
+  the legend, even when a producer bug leaves them in the record, and
+  any *truthy* `secret` scrubs — fail-closed means malformed producer
+  JSON errs toward withholding. It
   draws `<tag> [withheld]` and its legend entry says `redacted: true`,
   structural records included. "No destination" and "destination
   withheld" are different facts.

@@ -576,12 +576,18 @@ export const schematic = (
     //   back to its placeholder in italics (a hint must not read as content)
     // - everything else: label, then text, then value
     const toggle = w.type === 'checkbox' || w.type === 'radio'
+    // fail-closed means malformed errs toward WITHHOLDING (review F1): a
+    // truthy non-boolean secret (secret: 1 from mangled producer JSON)
+    // must scrub, not leak — every redaction gate shares this coercion
+    const secret = Boolean(w.secret)
     let caption: string
     let hint = false
-    if (w.secret === true) {
-      // FAIL-CLOSED redaction (0.5.0 review G1): a secret record's
-      // withholdable facts — label, text, value, placeholder, href —
-      // never reach the drawing, even when a producer bug left them in
+    if (secret) {
+      // FAIL-CLOSED redaction (0.5.0 review G1 + round-2 B1): a secret
+      // record's withholdable facts — label, text, value, placeholder,
+      // href, and image (the captured pixels are the highest-bandwidth
+      // fact of all) — never reach the drawing, even when a producer bug
+      // left them in
       // the record. `redacted` must never co-occur with the facts it
       // claims were withheld; the marker is all a secret record says.
       // (Assigned BEFORE the choke point so a forged arrow in `tag`
@@ -645,7 +651,10 @@ export const schematic = (
     // embedded media first: pixels the producer captured, drawn in place —
     // everything else (state geometry, captions, badges) reads over it
     const drawImage =
-      !structural && typeof w.image === 'string' && w.image.startsWith('data:')
+      !structural &&
+      !secret && // B1: withheld pixels never draw
+      typeof w.image === 'string' &&
+      w.image.startsWith('data:')
     // CRAMPED: the box can't legibly carry its dress — draw it bare (shape,
     // state geometry, emphasis, focus) with an auto stamp pointing into the
     // legend, where the metadata actually lives. Toggles are exempt from
@@ -847,13 +856,13 @@ export const schematic = (
       typeof w.href === 'string' &&
       w.href !== '' &&
       !structural &&
-      w.secret !== true // G1: a withheld destination never reaches the legend
+      !secret // G1: a withheld destination never reaches the legend
     ) {
       elided.href = w.href
     }
     if (cramped || truncated) {
       if (shownCaption !== '' && !toggle) elided.caption = caption
-      const heldValue = w.secret === true ? undefined : shownValue(w.value)
+      const heldValue = secret ? undefined : shownValue(w.value)
       if (heldValue) elided.value = heldValue
       if (cramped) {
         if (editable) elided.editable = true
@@ -869,7 +878,7 @@ export const schematic = (
     // redaction ALWAYS rides the legend, structural included: redacted is
     // a fact about the record, not a drawing concern — the consumer
     // reading "no href" must be able to tell withheld from absent (#15)
-    if (w.secret === true) elided.redacted = true
+    if (secret) elided.redacted = true
     const inLegend =
       elided.redacted != null ||
       elided.caption != null ||

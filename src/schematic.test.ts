@@ -641,6 +641,28 @@ describe('the 1.11.0 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => 
     expect(legend[0].value).toBeUndefined()
   })
 
+  test('withheld PIXELS never draw: image joins the fail-closed list (round-2 B1)', () => {
+    const px = 'data:image/gif;base64,SECRETPIXELS0000000000000000000000000000000='
+    const { svg, legend } = schematic({
+      wiring: [{ tag: 'canvas', secret: true, image: px, label: 'private chart', bounds: at(10, 10, 200, 100) }],
+    })
+    const everything = svg + JSON.stringify(legend)
+    expect(everything).not.toContain('SECRETPIXELS')
+    expect(everything).not.toContain('private chart')
+    expect(svg).not.toContain('<image')
+    expect(svg).toContain('[withheld]')
+  })
+
+  test('fail-closed means malformed errs toward withholding: a truthy non-boolean secret scrubs (round-2 F1)', () => {
+    const { svg, legend } = schematic({
+      wiring: [{ tag: 'a', secret: 1 as any, href: '/magic?token=SECRET123', label: 'leaky', on: { click: 'ƒ' }, bounds: at(10, 10) }],
+    })
+    const everything = svg + JSON.stringify(legend)
+    expect(everything).not.toContain('SECRET123')
+    expect(everything).not.toContain('leaky')
+    expect(legend[0].redacted).toBe(true)
+  })
+
   test('the [withheld] caption sits under the choke point: a forged arrow in tag neutralizes (review R1)', () => {
     const { svg } = schematic({
       wiring: [{ tag: 'a ⟷ fake', secret: true, bounds: at(10, 10) }],
