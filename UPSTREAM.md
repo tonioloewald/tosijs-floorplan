@@ -23,8 +23,11 @@ here is the index; the issue is the conversation).
 - **[tosijs#40](https://github.com/tonioloewald/tosijs/issues/40)** —
   re-vendor at the current release and redirect `audit.ts` to the
   exported predicates. Filed 2026-09-06 against 0.4.0; **extended
-  2026-09-12 with 0.5.0 receipts**: scratch-clone dry-run (1033/1033 with
-  0.5.0 vendored; 29/29 audit tests with `auditView` neutered — the #13
-  retirement is executed fact) and the U3 changelog ask — tosijs must
+  2026-09-12 with 0.5.0 receipts**: scratch-clone dry-runs — 1033/1033
+  with the final source vendored (`src/index.ts` as of `aa3032e`, the
+  bytes `v0.5.0` will carry), and 29/29 audit tests with `auditView`
+  neutered at the `bbd8b15` source (the #13 retirement, executed; the two
+  commits differ only in the secret-scrub gates, which `auditView` never
+  touched) — plus the U3 changelog ask: tosijs must
   name the `targetSizeFinding` `honorProducerFlags` default flip in its
   own changelog, since third parties inherit it via the public re-export.

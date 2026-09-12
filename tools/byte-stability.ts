@@ -62,17 +62,22 @@ const FIXTURES: Record<string, object> = {
     wiring: [
       // the fail-closed scrub path itself (G1 + round-2 B1): every
       // withholdable fact present, none may survive into the bytes
-      { tag: 'a', secret: true, href: '/magic?token=X', label: 'leak', value: 'X', placeholder: 'p', image: 'data:image/gif;base64,AAAA', on: { click: 'f' }, bounds: { x: 10, y: 10, width: 160, height: 24 } },
+      { tag: 'a', secret: true, href: '/magic?token=X', label: 'leak', text: 'leaky text', value: 'X', placeholder: 'p', image: 'data:image/gif;base64,AAAA', on: { click: 'f' }, bounds: { x: 10, y: 10, width: 160, height: 24 } },
     ],
   },
 }
 
-// fixture name → changelog entry licensing its divergence
-const EXPECTED_DIVERGENCE: Record<string, string> = {
-  'verdict-list-select': '0.5.0 Verdict changes — #7 evidence beats container role',
-  'verdict-target-ok-flag': '0.5.0 Verdict changes — #8 supersession requires a target-claim kind',
-  'verdict-capability-map': '0.5.0 Verdict changes — #10 capability evidence suppresses the note',
-  'verdict-secret-withheld': '0.5.0 Added — fail-closed secret redaction (G1 + round-2 B1)',
+// fixture name → the PUBLISHED VERSION it is licensed to diverge from,
+// plus the changelog entry licensing it. Version-keyed so licenses
+// SELF-EXPIRE (round-3 review): once the change publishes, the fetched
+// tarball's version no longer matches divergesFrom, the license reads as
+// stale, and the fixture becomes a byte pin — an armed license can never
+// excuse the next drift.
+const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string }> = {
+  'verdict-list-select': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #7 evidence beats container role' },
+  'verdict-target-ok-flag': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #8 supersession requires a target-claim kind' },
+  'verdict-capability-map': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #10 capability evidence suppresses the note' },
+  'verdict-secret-withheld': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Added — fail-closed secret redaction (G1 + round-2 B1)' },
 }
 
 const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
@@ -115,22 +120,25 @@ let failed = false
 for (const [name, map] of Object.entries(FIXTURES)) {
   const before = published.schematicSVG(map)
   const after = head.schematicSVG(map)
-  if (before === after) {
-    if (EXPECTED_DIVERGENCE[name]) {
-      // a license whose divergence vanished is STALE (review F2): once the
-      // change publishes, the fixture becomes a byte pin and its license
-      // must be deleted — an armed license would excuse the NEXT drift
-      failed = true
-      console.log(
-        `❌ ${name}: byte-identical but still licensed — the licensed change ` +
-          'has published; delete its EXPECTED_DIVERGENCE entry so this ' +
-          'fixture pins bytes again'
-      )
-    } else {
-      console.log(`✅ ${name}: byte-identical to published ${tarball.replace('.tgz', '')}`)
-    }
-  } else if (EXPECTED_DIVERGENCE[name]) {
-    console.log(`⚠️  ${name}: differs — licensed by "${EXPECTED_DIVERGENCE[name]}"`)
+  const published_name = tarball.replace('.tgz', '')
+  const license = EXPECTED_DIVERGENCE[name]
+  const licenseLive = license != null && license.divergesFrom === published_name
+  if (license != null && !licenseLive) {
+    // version mismatch = the licensed change has published — the license
+    // is STALE whether or not bytes currently differ, and a stale license
+    // must never excuse drift (round-3 review: the identical-bytes-only
+    // check fired exactly when there was nothing to catch)
+    failed = true
+    console.log(
+      `❌ ${name}: license is STALE (diverges from ${license.divergesFrom}, ` +
+        `published is ${published_name}) — delete its EXPECTED_DIVERGENCE ` +
+        'entry so this fixture pins bytes again' +
+        (before === after ? ' (bytes currently identical)' : ' (bytes DIFFER — investigate before deleting)')
+    )
+  } else if (before === after) {
+    console.log(`✅ ${name}: byte-identical to published ${published_name}`)
+  } else if (licenseLive) {
+    console.log(`⚠️  ${name}: differs — licensed by "${license.reason}"`)
   } else {
     failed = true
     let at = 0
