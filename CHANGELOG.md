@@ -37,19 +37,30 @@ retiring tosijs's private `auditView` workaround (#13).
 
 ### Added
 
-- **`secret` record field + `redacted` legend fact** (#15, from tosijs
-  1.11.0's secret regions): a record whose facts were withheld draws a
-  `<tag> [withheld]` caption instead of an anonymous bare box, and its
-  legend entry says `redacted: true` — "no destination" and "destination
+- **`secret` record field + `redacted` legend fact, FAIL-CLOSED** (#15,
+  from tosijs 1.11.0's secret regions; hardened by this release's review
+  G1, which caught the first cut fail-open — republishing a magic-link
+  token while stamping `redacted: true` beside the leak): a secret
+  record's label/text/value/placeholder/href never reach the drawing or
+  the legend, even when a producer bug leaves them in the record. It
+  draws `<tag> [withheld]` and its legend entry says `redacted: true`,
+  structural records included. "No destination" and "destination
   withheld" are different facts.
 - **`TARGET_FLAG_KINDS` exported**; `targetSizeFinding` gains the
   `honorProducerFlags` option (#8/#13).
 
 ### Fixed
 
-- **A `flags` entry without `kind` no longer throws** in either
-  `targetSizeFinding` or `schematic()` (#12) — `kind` gets the same
-  defense `severity` already had; it draws `data-flag=""`.
+- **Malformed `flags` entries no longer throw anywhere** (#12 + review
+  R2): a kind-less entry draws `data-flag=""`, and `flags: [null]` or a
+  non-string `label` no longer take down the render — every field of a
+  flags entry now has the defence `severity` got first.
+
+### Measured
+
+- `dist/index.js`: 16,925 → 17,964 bytes (+1,039, ~+6%) — the named
+  0.5.0 features; the stability harness now prints this delta every run,
+  since the source lands verbatim inside tosijs's bundle.
 
 ### Documented
 

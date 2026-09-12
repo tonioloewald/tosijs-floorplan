@@ -90,7 +90,7 @@ One flat record per wired element. Producers may add fields beyond these —
 | `contentEditable` | `boolean` | an editable region — treated as an input field |
 | `interactive` | `boolean` | the producer's **assertion** that this element can be acted on — for producers that cannot introspect handlers (React delegates at a root; vanilla `addEventListener` is not enumerable from page script). Asserting is truth-telling; fabricating `on` to unlock the styling would be a lie in the payload. A binding framework never needs it |
 | `editable` | `boolean` | the producer's assertion that text goes in here — the DOM-side counterpart of `contentEditable` / a two-way binding |
-| `secret` | `boolean` | the producer **withheld** facts about this element (a secret-marked region: a token lives in the destination, so neither `label` nor `href` is published). Draws a `<tag> [withheld]` caption when nothing else names it; the legend entry says `redacted: true` — "no destination" and "destination withheld" are different facts |
+| `secret` | `boolean` | the producer **withheld** facts about this element (a secret-marked region: a token lives in the destination, so neither `label` nor `href` is published). **Fail-closed on the renderer side**: a secret record's label/text/value/placeholder/href never reach the drawing or the legend even if a producer bug leaves them in the record — it draws `<tag> [withheld]` and its legend entry says `redacted: true` (structural records included) — "no destination" and "destination withheld" are different facts |
 | `on` | `Record<string, string \| string[]>` | handlers by event type — a path when nameable, `ƒ` (or `ƒ name`) when not |
 | `list` | `{path, idPath?}` | this element renders a collection (drawn as *ground*, not figure) |
 | `structural` | `boolean` | structure, not affordance (headings, landmarks, containers) |
@@ -126,7 +126,11 @@ bindable set is **open by design** (bound props ride under their own keys),
 so the never-scanned list is a denylist over an open key set: any key a
 producer invents is bindable, and arrows in it are trusted as structure.
 The defense is narrowed, not closed — producer-side neutralization remains
-the actual perimeter (issue #11).
+the actual perimeter (issue #11). The capability scan (below) likewise
+counts an arrow in **any position** within a bindable field: under the
+format's own last-occurrence parse, "contains an arrow" and "has a
+structural arrow" are equivalent for a lone token, so a position check
+would add no security — only the #11 perimeter does.
 
 **Producers that cannot introspect handlers** (React's synthetic delegation,
 Angular's compiler output, vanilla `addEventListener` — none enumerable from
@@ -197,7 +201,10 @@ parent text nodes) and ships the finding via `flags` — that is the
 of the **target-claim kinds** (`TARGET_FLAG_KINDS`, case-insensitive:
 `target`, `target-size`, `targetsize`, `target_size`, `smalltarget`)
 **supersedes** the drawn audit, so the two never double-mark — an explicit
-set, because a substring match let `target-ok` stand the audit down (#8).
+set, because a substring match let `target-ok` stand the audit down (#8);
+new target-claim kinds are added to `TARGET_FLAG_KINDS` via an issue here,
+the same additive path as any other format change, and the set is
+read-only by contract.
 Supersession is a *drawing* concern and therefore **opt-in**:
 `targetSizeFinding` ignores producer flags by default (an audit wants the
 geometry verdict regardless of what got drawn); `schematic()` passes

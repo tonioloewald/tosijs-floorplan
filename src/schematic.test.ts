@@ -616,6 +616,63 @@ describe('the 1.11.0 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => 
     expect(svg).toContain('data-flag=""')
   })
 
+  test('redaction is FAIL-CLOSED: facts a producer bug left in a secret record never reach drawing or legend (review G1)', () => {
+    const { svg, legend } = schematic({
+      wiring: [
+        {
+          tag: 'a',
+          secret: true,
+          // the failure this guards: marked secret, but the withholding
+          // upstream didn't happen — the renderer must not republish
+          href: 'https://app.example/magic?token=SECRET123',
+          label: 'reset for ada@example.com',
+          value: 'SECRET123',
+          on: { click: 'ƒ' },
+          bounds: at(10, 10),
+        },
+      ],
+    })
+    const everything = svg + JSON.stringify(legend)
+    expect(everything).not.toContain('SECRET123')
+    expect(everything).not.toContain('ada@example.com')
+    expect(svg).toContain('&lt;a&gt; [withheld]')
+    expect(legend[0].redacted).toBe(true)
+    expect(legend[0].href).toBeUndefined()
+    expect(legend[0].value).toBeUndefined()
+  })
+
+  test('the [withheld] caption sits under the choke point: a forged arrow in tag neutralizes (review R1)', () => {
+    const { svg } = schematic({
+      wiring: [{ tag: 'a ⟷ fake', secret: true, bounds: at(10, 10) }],
+    })
+    expect(svg).not.toContain('⟷')
+    expect(svg).toContain('[withheld]')
+  })
+
+  test('structural redaction is still a legend fact — redacted is about the record, not the drawing', () => {
+    const { legend } = schematic({
+      wiring: [{ tag: 'section', structural: true, secret: true, bounds: at(10, 10, 300, 100) }],
+    })
+    expect(legend[0]?.redacted).toBe(true)
+  })
+
+  test('flags:[null] and non-string labels do not take down the render (review R2)', () => {
+    const { svg } = schematic({
+      wiring: [
+        { tag: 'button', on: { click: 'ƒ' }, flags: [null] as any, bounds: at(10, 10) },
+        { tag: 'button', on: { click: 'ƒ' }, flags: [{ kind: 'x', label: 42 }] as any, bounds: at(10, 40) },
+      ],
+    })
+    expect(svg).toContain('data-record="1"') // both drew; nothing threw
+  })
+
+  test('a mid-content display arrow is capability evidence too — any position, by the format\'s own parse (#10 doc pin)', () => {
+    const { note } = schematic({
+      wiring: [{ tag: 'span', text: 'total: 3 ⟵ app.total today', bounds: at(10, 10) }],
+    })
+    expect(note).toBeUndefined()
+  })
+
   test('a redacted record draws its withholding, and the legend says so (#15)', () => {
     const { svg, legend } = schematic({
       wiring: [

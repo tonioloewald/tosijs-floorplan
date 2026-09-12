@@ -12,6 +12,12 @@ here is the index; the issue is the conversation).
   construction, so the defense is producer-side for DOM extractors.
   Filed 2026-09-06; targets their 1.13 adoption alongside issue #1's plan.
 
+- **[haltija#48](https://github.com/tonioloewald/haltija/issues/48)** —
+  TARGET_FLAG_KINDS sign-off for their 1.13 record-shape adoption (their
+  flags today are plain strings, verified in source; `'target'` matches
+  their prefix and is in the set). Filed 2026-09-12 from the 0.5.0
+  review's U1.
+
 ## tosijs
 
 - **[tosijs#40](https://github.com/tonioloewald/tosijs/issues/40)** —

@@ -15,7 +15,7 @@
  * preflight seam (asking for one is tracked in TODO.md); until that
  * exists, the human/agent cutting the tag runs this by hand.
  */
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -40,10 +40,32 @@ const FIXTURES: Record<string, object> = {
       { tag: 'button', text: 'x', on: { click: 'a.del' }, ref: '@9', flags: [{ kind: 'contrast', label: '2.3:1', severity: 'error' }], bounds: { x: 10, y: 300, width: 18, height: 18 } },
     ],
   },
+  // shapes whose VERDICT deliberately changed in 0.5.0 — these diverge
+  // from 0.4.0 by license; after 0.5.0 publishes they become byte pins
+  // for the new verdicts
+  'verdict-list-select': {
+    wiring: [
+      { tag: 'select', list: { path: 'app.options', idPath: 'id' }, value: 'b ⟷ app.choice', bounds: { x: 10, y: 10, width: 20, height: 20 } },
+    ],
+  },
+  'verdict-target-ok-flag': {
+    wiring: [
+      { tag: 'button', text: 'go', on: { click: 'f' }, flags: [{ kind: 'target-ok', label: 'fine' }], bounds: { x: 10, y: 10, width: 10, height: 10 } },
+    ],
+  },
+  'verdict-capability-map': {
+    wiring: [
+      { tag: 'span', text: '21C ⟵ dash.temp', bounds: { x: 10, y: 10, width: 160, height: 24 } },
+    ],
+  },
 }
 
-// fixture name → changelog entry licensing its divergence (none right now)
-const EXPECTED_DIVERGENCE: Record<string, string> = {}
+// fixture name → changelog entry licensing its divergence
+const EXPECTED_DIVERGENCE: Record<string, string> = {
+  'verdict-list-select': '0.5.0 Verdict changes — #7 evidence beats container role',
+  'verdict-target-ok-flag': '0.5.0 Verdict changes — #8 supersession requires a target-claim kind',
+  'verdict-capability-map': '0.5.0 Verdict changes — #10 capability evidence suppresses the note',
+}
 
 const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
 console.log(`working in ${dir}`)
@@ -66,6 +88,20 @@ if (untarred.exitCode !== 0) {
 
 const published = await import(join(dir, 'package', 'dist', 'index.js'))
 const head = await import('../src/index.ts')
+
+// bundle-size delta: source lands verbatim inside tosijs's bundle
+// (constraint 2), so growth is a consumer-visible fact — name it in the
+// CHANGELOG when it moves
+const pubBytes = statSync(join(dir, 'package', 'dist', 'index.js')).size
+const localDist = new URL('../dist/index.js', import.meta.url).pathname
+if (existsSync(localDist)) {
+  const headBytes = statSync(localDist).size
+  const delta = headBytes - pubBytes
+  console.log(
+    `published dist/index.js: ${pubBytes} bytes vs HEAD: ${headBytes} ` +
+      `(${delta >= 0 ? '+' : ''}${delta}; run \`bun run build\` first for an honest HEAD number)`
+  )
+}
 
 let failed = false
 for (const [name, map] of Object.entries(FIXTURES)) {

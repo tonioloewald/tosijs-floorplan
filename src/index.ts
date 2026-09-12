@@ -337,7 +337,7 @@ export const TARGET_SIZE_DEFAULT = 24
  * 'target-ok' — or any kind merely mentioning the word — silently stand
  * the audit down (#8). Covers both producers' kinds in the wild
  * (haltija: 'target', 'smallTarget'; tosijs auditFlags: 'target-size'). */
-export const TARGET_FLAG_KINDS = new Set([
+export const TARGET_FLAG_KINDS: ReadonlySet<string> = new Set([
   'target',
   'target-size',
   'targetsize',
@@ -543,10 +543,11 @@ export const schematic = (
     !description.wiring.some(hasCapabilityEvidence)
   const note = blind
     ? 'no record carries affordance evidence (on, href, contentEditable, ' +
-      'a two-way binding, or an interactive/editable assertion) — ' +
-      '"nothing here is actionable" is NOT established; a producer that ' +
-      'cannot introspect handlers should assert `interactive`/`editable` ' +
-      'per record (see README)'
+      'a two-way binding, or an interactive/editable assertion), and none ' +
+      'shows the producer can see wiring at all (no handler, assertion, ' +
+      'or provenance arrow anywhere) — "nothing here is actionable" is ' +
+      'NOT established; a producer that cannot introspect handlers ' +
+      'should assert `interactive`/`editable` per record (see README)'
     : undefined
   for (const w of drawOrder) {
     const index = description.wiring.indexOf(w)
@@ -577,7 +578,16 @@ export const schematic = (
     const toggle = w.type === 'checkbox' || w.type === 'radio'
     let caption: string
     let hint = false
-    if (isContainer) {
+    if (w.secret === true) {
+      // FAIL-CLOSED redaction (0.5.0 review G1): a secret record's
+      // withholdable facts — label, text, value, placeholder, href —
+      // never reach the drawing, even when a producer bug left them in
+      // the record. `redacted` must never co-occur with the facts it
+      // claims were withheld; the marker is all a secret record says.
+      // (Assigned BEFORE the choke point so a forged arrow in `tag`
+      // still neutralizes — review R1.)
+      caption = `<${w.tag}> [withheld]`
+    } else if (isContainer) {
       caption = String(w.label ?? '')
     } else if (toggle) {
       caption = String(w.label ?? '')
@@ -615,10 +625,6 @@ export const schematic = (
     // one choke point: the 0.4.0 review's B1 found the arrow defense
     // bypassed by exactly the sources this line now covers
     caption = neutralizeArrows(caption)
-    // a REDACTED record whose caption chain came up empty draws its
-    // withholding instead of an anonymous bare box (#15) — ASCII, per the
-    // grammar's first law
-    if (w.secret === true && caption === '') caption = `<${w.tag}> [withheld]`
     const structural = isGround(w)
     // the affordance grammar, explicit: BOLD outline = wired to act —
     // handlers, a link destination (href: a link IS an affordance, 0.4.0),
@@ -719,7 +725,9 @@ export const schematic = (
         )
       })
       const first = w.flags[0]
-      if (first.label && height >= minLabelHeight) {
+      // producer JSON to the last line (R2): flags:[null] and non-string
+      // labels must not take down the render — same defence the forEach got
+      if (typeof first?.label === 'string' && first.label !== '' && height >= minLabelHeight) {
         parts.push(
           `<rect x="${x + w.flags.length * 3 + 1}" y="${y + height - 9}" ` +
             `width="${first.label.length * 4.5 + 2}" height="8" ` +
@@ -835,12 +843,17 @@ export const schematic = (
     // a destination is always legend-worthy: it never fits a caption
     // legibly, and it's the fact an agent acts on ("goes to Y", not
     // "says X")
-    if (typeof w.href === 'string' && w.href !== '' && !structural) {
+    if (
+      typeof w.href === 'string' &&
+      w.href !== '' &&
+      !structural &&
+      w.secret !== true // G1: a withheld destination never reaches the legend
+    ) {
       elided.href = w.href
     }
     if (cramped || truncated) {
       if (shownCaption !== '' && !toggle) elided.caption = caption
-      const heldValue = shownValue(w.value)
+      const heldValue = w.secret === true ? undefined : shownValue(w.value)
       if (heldValue) elided.value = heldValue
       if (cramped) {
         if (editable) elided.editable = true
@@ -853,9 +866,10 @@ export const schematic = (
     if (w.invalid === true && cramped) elided.invalid = true
     if (w.disabled === true && cramped) elided.disabled = true
     if (undersized != null) elided.undersized = undersized
-    // redaction always rides the legend: the consumer reading "no href"
-    // must be able to tell withheld from absent (#15)
-    if (w.secret === true && !structural) elided.redacted = true
+    // redaction ALWAYS rides the legend, structural included: redacted is
+    // a fact about the record, not a drawing concern — the consumer
+    // reading "no href" must be able to tell withheld from absent (#15)
+    if (w.secret === true) elided.redacted = true
     const inLegend =
       elided.redacted != null ||
       elided.caption != null ||
