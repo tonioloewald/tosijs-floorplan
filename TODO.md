@@ -1,10 +1,10 @@
 # TODO
 
-- [ ] **Test the stale-license branch in `tools/byte-stability.ts` at the
-  next release** (round-3 review): the branch can only execute for real
-  once a licensed change has published — at the 0.5.x/0.6.0 cycle, delete
-  the four 0.5.0 licenses when the tool flags them stale, and add a test
-  for the version-mismatch path while in there.
+- [ ] **Add a test for byte-stability's version-mismatch (stale-license)
+  path** (round-3 review, second half): the branch executed for real at
+  the 0.5.0 publish — flagged all four licenses stale, bytes-identical,
+  exactly as designed — and the licenses are deleted. The unit test for
+  the path is still owed when the tool next gets touched.
 
 Follow-ups from the 0.4.0 pre-release review (`reviews/0.4.0-producer-parity.md`)
 that survived remediation — everything else in that report was fixed in the

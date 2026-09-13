@@ -2,6 +2,28 @@
 
 Newest first. Facts, not analysis — the quarterly pass asks the whys.
 
+## 0.5.0 — 2026-09-13
+
+- Went well: all nine adoption issues (#7–#15, all from tosijs 1.11.0)
+  landed as one batch; the exported predicates now reproduce audit
+  verdicts (tosijs's auditView verified deletable by neutering it in a
+  scratch clone — 29/29). Round-3 follow-ups were all executed pre-tag
+  rather than deferred.
+- Went well: the version-keyed license self-expiry executed for real at
+  publish — all four 0.5.0 licenses flagged stale, bytes identical,
+  deleted same-day; the verdict fixtures are byte pins now.
+- Didn't (cycle flags, ×2): rounds 1 and 2 both BLOCKed on the secret-
+  redaction path — first the metadata scrub fail-open (G1), then the
+  scrub missing `image` (B1) — the same field-list/spec-gap class twice
+  in one cycle.
+- Didn't: the first `npm publish` failed silently (user report:
+  "apparently the last time really did fail") — second occurrence of
+  publish-confirmation friction in two releases (0.4.0: slow propagation
+  read as done; 0.5.0: reported done, never landed). Registry-direct
+  verification caught both before tagging.
+- Follow-through open: tosijs#40 re-vendor at v0.5.0 (receipts on
+  thread), haltija#45/#48 (their 1.13), TODO.md ×4.
+
 ## 0.4.0 — 2026-09-06
 
 - Went well: all four open consumer issues (#2–#5) closed through one seam

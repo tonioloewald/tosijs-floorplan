@@ -74,10 +74,8 @@ const FIXTURES: Record<string, object> = {
 // stale, and the fixture becomes a byte pin — an armed license can never
 // excuse the next drift.
 const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string }> = {
-  'verdict-list-select': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #7 evidence beats container role' },
-  'verdict-target-ok-flag': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #8 supersession requires a target-claim kind' },
-  'verdict-capability-map': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Verdict changes — #10 capability evidence suppresses the note' },
-  'verdict-secret-withheld': { divergesFrom: 'tosijs-floorplan-0.4.0', reason: '0.5.0 Added — fail-closed secret redaction (G1 + round-2 B1)' },
+  // (empty since 0.5.0 published — its four verdict-change licenses
+  // self-expired on first post-publish run and the fixtures now pin bytes)
 }
 
 const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
