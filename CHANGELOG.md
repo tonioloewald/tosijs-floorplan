@@ -4,9 +4,19 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [Unreleased]
+
+### Fixed
+
+- **Doc comment on `secret` cited a tosijs version that never shipped**
+  (#16): "tosijs 1.11.0" was renumbered to 1.10.2 before release. The
+  vendored comment now says "tosijs' secret regions" (cannot go stale);
+  the 0.5.0 entry below is corrected to 1.10.2. Comment-only — no emitted
+  SVG or verdict changes.
+
 ## [0.5.0] - 2026-09-12
 
-The adoption-feedback release: all nine issues from tosijs 1.11.0's
+The adoption-feedback release: all nine issues from tosijs 1.10.2's
 adoption of 0.4.0 (#7–#15), landed as one batch. The predicates now
 reproduce an audit's verdicts without consumer-side normalization,
 retiring tosijs's private `auditView` workaround (#13).
@@ -38,7 +48,7 @@ retiring tosijs's private `auditView` workaround (#13).
 ### Added
 
 - **`secret` record field + `redacted` legend fact, FAIL-CLOSED** (#15,
-  from tosijs 1.11.0's secret regions; hardened by this release's review
+  from tosijs 1.10.2's secret regions; hardened by this release's review
   G1, which caught the first cut fail-open — republishing a magic-link
   token while stamping `redacted: true` beside the leak — and whose
   round-2 B1 caught the scrub missing `image`, the captured pixels being

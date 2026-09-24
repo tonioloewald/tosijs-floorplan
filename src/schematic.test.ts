@@ -556,7 +556,7 @@ describe('decorate — the plugin seam', () => {
   })
 })
 
-describe('the 1.11.0 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => {
+describe('the tosijs 1.10.2 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => {
   const at = (x: number, y: number, width = 160, height = 24) => ({ x, y, width, height })
 
   test('evidence beats container role: a list-bound <select> that IS the control is an affordance (#7)', () => {
@@ -701,7 +701,7 @@ describe('the 1.11.0 adoption feedback (0.5.0 — #7/#8/#9/#10/#12/#15)', () => 
   test('a redacted record draws its withholding, and the legend says so (#15)', () => {
     const { svg, legend } = schematic({
       wiring: [
-        // tosijs 1.11.0's secret-region shape: neither label nor href
+        // tosijs' secret-region shape: neither label nor href
         { tag: 'a', secret: true, text: '⟵ s.name', on: { click: 'ƒ' }, bounds: at(10, 10) },
         { tag: 'a', text: 'plain link', href: '/x', on: { click: 'ƒ' }, bounds: at(10, 40) },
       ],

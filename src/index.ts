@@ -79,8 +79,8 @@ export interface SchematicRecord {
   /** the producer's assertion that text goes in here — the DOM-side
    * counterpart of contentEditable/two-way bindings (issue #3) */
   editable?: boolean
-  /** the producer WITHHELD facts about this element (tosijs 1.11.0's
-   * secret regions: a magic-link token lives in the href, so neither
+  /** the producer WITHHELD facts about this element (tosijs' secret
+   * regions: a magic-link token lives in the href, so neither
    * label nor href is published). Drawn with a `[withheld]` caption when
    * nothing else names it, and the legend says redacted — "this link has
    * no destination" and "its destination was withheld" are different
