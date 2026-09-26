@@ -13,6 +13,16 @@ are documented here
   vendored comment now says "tosijs' secret regions" (cannot go stale);
   the 0.5.0 entry below is corrected to 1.10.2. Comment-only — no emitted
   SVG or verdict changes.
+- **The tarball no longer ships `src/schematic.test.ts`**: `files` names
+  `src/index.ts` (the file tosijs vendors) instead of all of `src/`. The
+  test file's relative import could not resolve from the package, which
+  release-doctor flagged. dist/ is unchanged.
+
+### Changed
+
+- Publishing moves to the shared OIDC + npm staged-publish workflow
+  (`.github/workflows/publish.yml`): CI stages each release and the owner
+  approves it with 2FA. Bun is pinned in `.bun-version` (1.4.2).
 
 ## [0.5.0] - 2026-09-12
 

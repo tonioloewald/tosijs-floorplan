@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A **micro-library**: the floorplan renderer for agent-surface maps, extracted
 from tosijs's *one user interface* work. One source file, one test file, a
 README that doubles as the **record-format specification**. It is deliberately
-boring: no doc site, no CI apparatus, no framework. Keep it that way until an
+boring: no doc site, no CI beyond the ecosystem's shared publish
+workflow, no framework. Keep it that way until an
 external plugin gallery genuinely demands more.
 
 **Named `tosijs-floorplan` since 0.3.0** (formerly `tosijs-schematic`,
@@ -26,8 +27,16 @@ bun run stability  # MANDATORY before tagging: renders fixtures through the
                    # published dist vs HEAD, fails on unlicensed byte drift
                    # (constraint 3's guard; needs network; nothing runs it
                    # automatically)
-npm publish        # prepublishOnly runs tests + build; publish is manual
+gh workflow run publish.yml -f tag=main -f dry_run=true  # before tagging
+gh workflow run publish.yml -f tag=vX.Y.Z  # after pushing the tag: CI
+                   # stages it on npm; the owner approves with 2FA
 ```
+
+Publishing goes through `.github/workflows/publish.yml`, a verbatim copy of
+`../tosijs-coding-practices/templates/publish.yml`. Don't edit it here: fix
+the template and copy it again. See `practices/publishing-via-oidc.md` there.
+`bun run stability` is still run by hand before tagging, because the
+workflow doesn't run it (see TODO.md, "release-doctor preflight seam").
 
 The suite lives beside the source (`src/schematic.test.ts` — there is no
 `test/` directory) and asserts on emitted SVG substrings, which is what
@@ -46,7 +55,8 @@ those assertions deliberately.
    `tosijs/src/schematic.ts` from `node_modules/tosijs-floorplan/src/index.ts`
    (path updates with tosijs's adoption of the rename; check their
    `vendorSchematic()` in `bin/site.ts` — issue filed on the rename). That
-   means: `src/` ships in the npm tarball on purpose (`files` field); the
+   means: `src/index.ts` ships in the npm tarball on purpose (`files` field
+   names it alone; the test file stays out); the
    source must remain a **single self-contained file**; and anything you
    change here lands inside tosijs's bundle on its next `bun update` +
    rebuild. tosijs stays zero-runtime-dependency *because* of this
