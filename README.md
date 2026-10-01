@@ -240,8 +240,9 @@ geometry genuinely runs out.
 `index: true` (stamp record indexes); `targetSize` (the undersized-audit
 floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
 the footer strip); `decorate` (below). A `pad` or `fontSize` that isn't a
-number (a string, array or object) is its default, and a `within` with
-such a field renders an empty map, rather than the whole one. These are
+number primitive (a string, boolean, array or object, `Number` wrappers
+included) is its default, and a `within` with such a field renders an
+empty map, rather than the whole one. These are
 the options that print into the SVG. Every other option value behaves as
 it always has.
 
@@ -251,7 +252,8 @@ it always has.
 its `<g>` closes, with the record, its resolved geometry, and an `emit`
 function. The corner slots already spoken for: **top-left** invalid flag,
 **top-right** index, **bottom-right** `↔` badge, **outline** focus/emphasis.
-`emit` takes raw SVG. The core guarantees that only escaped text and numbers
+`emit` takes raw SVG. For plain-data records and options (JSON-shaped, no
+getters or proxies), the core guarantees that only escaped text and numbers
 reach its attributes, but that doesn't cover what a plugin emits: escape
 anything you interpolate from the record. Claim empty real estate:
 

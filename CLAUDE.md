@@ -58,8 +58,10 @@ those assertions deliberately.
    means: `src/index.ts` ships in the npm tarball on purpose (`files` field
    names it alone; the test file stays out); the
    source must remain a **single self-contained file**; and anything you
-   change here lands inside tosijs's bundle on its next `bun update` +
-   rebuild. tosijs stays zero-runtime-dependency *because* of this
+   change here lands inside tosijs's bundle once tosijs bumps its pin.
+   tosijs pins this package exactly, so a plain `bun update` does NOT pick
+   up a release; it needs a pin bump and a rebuild, and a security fix here
+   needs a tosijs issue asking for one. tosijs stays zero-runtime-dependency *because* of this
    arrangement — do not convert it to an import.
 
 3. **Output stability is a feature, not an accident.** tosijs commits its
@@ -73,7 +75,9 @@ those assertions deliberately.
    the predicates): same input → different `isInteractive`/
    `targetSizeFinding` answer is a public-behavior change for consumers even
    when no API changed — name the record shapes affected, as 0.4.0 did for
-   `href`.
+   `href`. **The legend is an output surface too**: a change in which
+   records reach the legend, or what their entries say, counts, including
+   one caused by a wrong-type *option* (0.5.1: `within`, `fontSize`).
 
 4. **The record format is a multi-producer contract — not this repo's to
    change unilaterally.** Producers: tosijs's `describe()` (the reference

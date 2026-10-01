@@ -38,16 +38,31 @@ are documented here
   `decorate` plugin output is raw SVG and stays the plugin's
   responsibility. Both producers emit numeric bounds (tosijs `describe()`
   `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields). **tosijs
-  vendors this file**: its next re-vendor picks the fix up.
+  vendors this file, but pins `tosijs-floorplan` exactly (`0.5.0`)**, so
+  `bun update` does not deliver this fix. tosijs picks it up when it bumps
+  the pin to 0.5.1 and re-vendors.
 
 ### Verdict changes — same input, different answer
 
+No input of the declared type changes any verdict. These inputs that
+broke their declared types do:
+
 - **Records with non-finite or string `bounds`** (`x: '10'`, NaN,
   Infinity) are no longer drawn, so they no longer get a legend entry or
-  an `undersized` verdict. In 0.5.0 they drew with broken geometry, and an
-  Infinity coordinate made the whole map unrenderable. `isInteractive` and
-  `targetSizeFinding` themselves are unchanged, and no option changes any
-  verdict.
+  an `undersized` verdict from `schematic()`. In 0.5.0 they drew with
+  broken geometry, and an Infinity coordinate made the whole map
+  unrenderable. `isInteractive` and `targetSizeFinding` are unchanged, so
+  called directly on such a record, `targetSizeFinding` still answers (a
+  string `'18'` coerces), while the map no longer draws it.
+- **A `within` with any field that isn't a number primitive** (`'0'`,
+  `true`, an array, an object, a `Number` wrapper) draws an empty map. So
+  every record under it loses its legend entry, including `undersized`.
+  0.5.0 coerced most of these. Nothing yet tells a caller "bad region"
+  from "empty region" (board #2744).
+- **A `fontSize` that isn't a number primitive** now uses 11. Besides the
+  drawing, that moves records in and out of the legend: a box is cramped
+  below `fontSize × 3` wide, so with `fontSize: '12'`, a 34 px-wide box
+  was cramped (legend) in 0.5.0 and draws its caption now.
 
 ### Measured
 

@@ -44,7 +44,8 @@ floor: 24 default per WCAG 2.5.8, 44/48 for touch, 0 off),
 ## The record format (multi-producer contract)
 
 One flat record per wired element: `tag` (required), `bounds`
-({x,y,width,height} — zero-size or absent = not drawn), `label`
+({x,y,width,height} — zero-size or absent = not drawn; any field
+not a finite number, even the string '10' = not drawn), `label`
 (accessible name), `placeholder` (hint — never conflated with content),
 `text`, `value`, `href`, `type`, `checked`, `focused`, `invalid`,
 `required`, `disabled`, `contentEditable`, `interactive` and `editable`
