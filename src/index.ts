@@ -382,6 +382,16 @@ export const targetSizeFinding = (
     : null
 }
 
+// geometry fails closed: every coordinate is interpolated into SVG
+// attributes, so a record whose bounds aren't finite numbers is not drawn
+// (a string x on a viewportFixed record skipped every arithmetic check and
+// landed in x="…" verbatim — attribute injection from data)
+const finiteBounds = (b: SchematicBounds): boolean =>
+  Number.isFinite(b.x) &&
+  Number.isFinite(b.y) &&
+  Number.isFinite(b.width) &&
+  Number.isFinite(b.height)
+
 const intersects = (a: SchematicBounds, b: SchematicBounds): boolean =>
   a.x < b.x + b.width &&
   b.x < a.x + a.width &&
@@ -468,9 +478,14 @@ export const schematic = (
     decorate,
   } = options
   const legend: SchematicLegendEntry[] = []
+  // an unusable region draws nothing rather than silently widening the
+  // crop to the whole map
+  const withinOk = within == null || finiteBounds(within)
   const boxes = description.wiring.filter(
     (w) =>
+      withinOk &&
       w.bounds != null &&
+      finiteBounds(w.bounds) &&
       w.bounds.width > 0 &&
       w.bounds.height > 0 &&
       // fully negative coordinates = hidden by off-page positioning (the

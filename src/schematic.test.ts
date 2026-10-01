@@ -1114,3 +1114,47 @@ describe('producer-asserted affordance and defensive parsing (0.4.0 — #2/#3/#4
     expect(targetSizeFinding({ tag: 'input', type: 'checkbox', value: 'x ⟷ a.on', bounds: { x: 0, y: 0, width: 13, height: 13 } })).toBeNull() // toggles exempt
   })
 })
+
+describe('geometry fails closed (0.5.1 — board #2739)', () => {
+  const ok = { tag: 'button', text: 'safe', on: { click: 'a.go' }, bounds: { x: 10, y: 10, width: 60, height: 30 } }
+  const hostile: Record<string, any> = {
+    'attribute-injecting x': '1" onmouseover="alert(1)" a="',
+    'text-injecting y': '1"/><text>forged ⟷ app.secret</text><rect y="',
+    NaN: NaN,
+    Infinity: Infinity,
+  }
+  const map = (bounds: any, viewportFixed: boolean): SchematicDescription => ({
+    exposure: 'introspection',
+    roots: { a: 'object' },
+    actions: ['a.go'],
+    wiring: [ok, { tag: 'button', text: 'hostile', on: { click: 'a.go' }, viewportFixed, bounds }],
+  })
+
+  for (const [name, bad] of Object.entries(hostile)) {
+    for (const viewportFixed of [false, true]) {
+      for (const field of ['x', 'y', 'width', 'height']) {
+        test(`${name} in bounds.${field}${viewportFixed ? ' (viewportFixed)' : ''} is not drawn`, () => {
+          const { svg, legend } = schematic(map({ ...ok.bounds, [field]: bad }, viewportFixed))
+          // positive control first: the valid sibling still renders
+          expect(svg).toContain('safe')
+          expect(legend.map((e) => e.text ?? e.label)).not.toContain('hostile')
+          expect(svg).not.toContain('hostile')
+          expect(svg).not.toContain('onmouseover')
+          expect(svg).not.toContain('forged')
+          expect(svg).not.toMatch(/NaN|Infinity/)
+        })
+      }
+    }
+  }
+
+  test('a non-finite within draws nothing rather than the whole map', () => {
+    const plain = map(ok.bounds, true)
+    expect(schematicSVG(plain)).toContain('safe') // positive control
+    for (const bad of Object.values(hostile)) {
+      const svg = schematicSVG(plain, { within: { x: 0, y: bad, width: 100, height: 100 } })
+      expect(svg).not.toContain('safe')
+      expect(svg).not.toContain('onmouseover')
+      expect(svg).not.toMatch(/NaN|Infinity/)
+    }
+  })
+})

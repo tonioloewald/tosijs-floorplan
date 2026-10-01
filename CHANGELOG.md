@@ -6,6 +6,21 @@ are documented here
 
 ## [Unreleased]
 
+### Security
+
+- **Geometry fails closed** (board #2739, found by this release's pre-tag
+  review; present in 0.5.0 and earlier). A record whose `bounds` were not
+  finite numbers could inject SVG markup. On a `viewportFixed` record, a
+  string `x`/`y` skipped every arithmetic check and was written verbatim
+  into `x="…"`/`y="…"`, so `'1" onmouseover="…'` added an attribute and a
+  hostile `y` could add a forged `<text>`, defeating the `secret` and
+  forged-glyph guarantees. Such a record is now **not drawn**. A `within`
+  with non-finite fields draws nothing, rather than the whole map. Only
+  records that already broke their declared types change: numeric-string
+  bounds no longer draw either. Valid input is byte-identical to 0.5.0
+  (`bun run stability`), and `isInteractive`/`targetSizeFinding` are
+  unchanged, so no verdict changes.
+
 ### Fixed
 
 - **Doc comment on `secret` cited a tosijs version that never shipped**
