@@ -36,7 +36,7 @@ Publishing goes through `.github/workflows/publish.yml`, a verbatim copy of
 `../tosijs-coding-practices/templates/publish.yml`. Don't edit it here: fix
 the template and copy it again. See `practices/publishing-via-oidc.md` there.
 `bun run stability` is still run by hand before tagging, because the
-workflow doesn't run it (see TODO.md, "release-doctor preflight seam").
+workflow doesn't run it (board #2588, "release-doctor preflight seam").
 
 The suite lives beside the source (`src/schematic.test.ts` — there is no
 `test/` directory) and asserts on emitted SVG substrings, which is what
@@ -105,10 +105,15 @@ those assertions deliberately.
 
 ## Ecosystem practices
 
+**Tasks live on the virta board** (project `tosijs-floorplan`, onboarded
+2026-10-01). `TODO.md` and `UPSTREAM.md` are pointers only, so don't add
+list items to them. `virta brief` prints the board for this repo.
+
 This repo follows the shared conventions in `../tosijs-coding-practices`
 (read it; contribute lessons back). The ones that bite here: **file, don't
-fix** (problems in tosijs/haltija get an issue on their repo, mirrored in
-their UPSTREAM.md — never a drive-by edit); commits carry receipts (what was
+fix** (problems in tosijs/haltija become a task in *their* project on the
+virta board, which this repo subscribes to — never a drive-by edit;
+GitHub issues are for repos not on the board); commits carry receipts (what was
 verified, how); knowledge sinks to the lowest layer that holds it — if a
 lesson is about the *format*, it belongs in the README spec, not in a
 comment.
