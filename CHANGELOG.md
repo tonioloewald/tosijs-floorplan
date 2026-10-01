@@ -4,7 +4,7 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
-## [Unreleased]
+## [0.5.1] - 2026-10-02
 
 ### Security
 
