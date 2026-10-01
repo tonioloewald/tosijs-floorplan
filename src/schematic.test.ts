@@ -1153,7 +1153,9 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
   test('a non-finite within draws nothing rather than the whole map', () => {
     const plain = map(ok.bounds, true)
     expect(schematicSVG(plain)).toContain('safe') // positive control
-    for (const bad of Object.values(hostile)) {
+    // within is an OPTION: a numeric string coerces (asserted below), so
+    // only values that can't become a number are hostile here
+    for (const bad of Object.values(hostile).filter((v) => !Number.isFinite(Number(v)))) {
       for (const field of ['x', 'y', 'width', 'height']) {
         const svg = schematicSVG(plain, { within: { x: 0, y: 0, width: 100, height: 100, [field]: bad } })
         expect(svg).not.toContain('safe')
@@ -1163,9 +1165,19 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
     }
   })
 
+  test('within coerces like any option: numeric strings are the number', () => {
+    const plain = map(ok.bounds, false)
+    const region = { x: 0, y: 0, width: 100, height: 100 }
+    expect(schematicSVG(plain, { within: { x: '0', y: '0', width: '100', height: '100' } as any })).toBe(
+      schematicSVG(plain, { within: region })
+    )
+  })
+
   // options reach attributes too (font-size, the viewBox, pinned offsets,
-  // the legend footer): a non-finite numeric option falls back to its
-  // default — the drawing is exactly the default drawing
+  // the legend footer). They are the integrator's config, coerced as 0.5.0's
+  // arithmetic coerced them: a value that becomes a finite number draws as
+  // that number; anything else falls back to the default. (0.5.0
+  // byte-equality for config-shaped values is pinned in tools/byte-stability.ts.)
   const flagged: SchematicDescription = {
     exposure: 'introspection',
     roots: { a: 'object' },
@@ -1175,13 +1187,28 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
       { tag: 'nav', text: 'pinned', on: { click: 'a.go' }, viewportFixed: true, bounds: { x: 0, y: 0, width: 80, height: 20 } },
     ],
   }
+  test('targetSize keeps its 0.5.0 meaning for config-shaped values (round-3 review)', () => {
+    const small = { ...flagged, wiring: [{ ...ok, bounds: { x: 10, y: 10, width: 20, height: 20 } }] }
+    const undersized = (o: object) => schematic(small, o).legend.some((e) => e.undersized != null)
+    expect(undersized({ targetSize: 44 })).toBe(true) // positive control
+    expect(undersized({ targetSize: '44' })).toBe(true) // the audit must not fail open
+    expect(undersized({ targetSize: null })).toBe(false) // null was off in 0.5.0
+    expect(undersized({ targetSize: '0' })).toBe(false)
+    expect(undersized({ targetSize: 'big' })).toBe(true) // garbage → the default (24), never off
+  })
+
   for (const option of ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']) {
     for (const [name, bad] of Object.entries(hostile)) {
       for (const within of [undefined, { x: 0, y: 0, width: 200, height: 100 }]) {
-        test(`${name} as options.${option}${within ? ' (within)' : ''} draws the default drawing`, () => {
+        test(`${name} as options.${option}${within ? ' (within)' : ''} draws as its number, or the default`, () => {
           const baseline = schematicSVG(flagged, { within })
           expect(baseline).toContain('safe') // positive control
-          expect(schematicSVG(flagged, { within, [option]: bad })).toBe(baseline)
+          const n = Number(bad)
+          const expected = Number.isFinite(n) ? schematicSVG(flagged, { within, [option]: n }) : baseline
+          const svg = schematicSVG(flagged, { within, [option]: bad })
+          expect(svg).toBe(expected)
+          expect(svg).not.toContain('onmouseover')
+          expect(svg).not.toMatch(/NaN|Infinity/)
         })
       }
     }

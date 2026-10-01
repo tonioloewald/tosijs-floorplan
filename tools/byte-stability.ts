@@ -114,10 +114,33 @@ if (existsSync(localDist)) {
   )
 }
 
+// option values the integrator may pass as config (strings from a query
+// string, null for "unset"): every one 0.5.0 drew correctly must draw
+// byte-identically — 0.5.1's fail-closed coercion may only change values
+// that never produced a valid drawing (round-3 review: a strict check made
+// targetSize '44' silently fall back to 24, failing the audit open)
+const OPTION_CASES: Record<string, object> = {
+  'targetSize "44"': { targetSize: '44' },
+  'targetSize "0"': { targetSize: '0' },
+  'targetSize null': { targetSize: null },
+  'pad null': { pad: null },
+  'minLabelHeight null': { minLabelHeight: null },
+  'minLabelHeight "40"': { minLabelHeight: '40' },
+  'maxCaption "8"': { maxCaption: '8' },
+}
+const RUNS: [string, object, object | undefined][] = Object.entries(FIXTURES).map(
+  ([name, map]) => [name, map, undefined]
+)
+// form for layout options; sink carries an 18×18 button, so the target-size
+// audit has something to say
+for (const [name, options] of Object.entries(OPTION_CASES))
+  for (const fixture of ['form', 'sink'])
+    RUNS.push([`${fixture} + ${name}`, FIXTURES[fixture], options])
+
 let failed = false
-for (const [name, map] of Object.entries(FIXTURES)) {
-  const before = published.schematicSVG(map)
-  const after = head.schematicSVG(map)
+for (const [name, map, options] of RUNS) {
+  const before = published.schematicSVG(map, options)
+  const after = head.schematicSVG(map, options)
   const published_name = tarball.replace('.tgz', '')
   const license = EXPECTED_DIVERGENCE[name]
   const licenseLive = license != null && license.divergesFrom === published_name

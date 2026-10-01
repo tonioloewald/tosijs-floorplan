@@ -10,35 +10,49 @@ are documented here
 
 - **Geometry fails closed** (board #2739, found by this release's pre-tag
   review; present in 0.5.0 and earlier). Coordinates are written into SVG
-  attributes, and data that wasn't a finite number could inject markup. On a
+  attributes, and data that wasn't a number could inject markup. On a
   `viewportFixed` record, a string `x`/`y` skipped every arithmetic check
   and was written verbatim into `x="…"`/`y="…"`, so `'1" onmouseover="…'`
   added an attribute and a hostile `y` could add a forged `<text>`,
   defeating the `secret` and forged-glyph guarantees. The `pad` and
   `fontSize` options reached `font-size`, the viewBox and the pinned
-  offsets the same way (found by the review's second round). The class is
-  now closed at both inputs:
-  - a **record** whose `bounds` has any non-finite field (NaN, Infinity, a
-    string, even `'10'`) is **not drawn**;
-  - a `within` with any non-finite field draws an empty map, rather than
-    the whole one;
-  - a numeric **option** (`pad`, `minLabelHeight`, `maxCaption`,
-    `fontSize`, `targetSize`) that isn't a finite number falls back to its
-    default.
+  offsets the same way. Two input contracts now close it:
+  - **Records** are untrusted producer data. A record whose `bounds` has
+    any field that isn't a finite number (NaN, Infinity, any string, even
+    `'10'`) is **not drawn**.
+  - **Options** are the integrator's own config, coerced as 0.5.0's
+    arithmetic coerced them (`'44'` is 44, `null` is 0). Every option
+    value that drew correctly in 0.5.0 draws byte-identically, which
+    `bun run stability` now pins. A value that can't become a number
+    falls back to the default. A `within` that can't become a rect draws
+    an empty map, rather than the whole one.
 
-  Every unescaped attribute value now derives from those, or from a string
-  length times a constant. Only input that broke its declared types
-  changes. Both producers emit numeric bounds (tosijs `describe()`
-  `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields). Valid input is
-  byte-identical to 0.5.0 (`bun run stability`), and `isInteractive`/
-  `targetSizeFinding` are unchanged, so no verdict changes. **tosijs
-  vendors this file**: its next re-vendor picks the fix up.
+  What reaches an attribute is now escaped text or a JS number's text.
+  An overflowing number can still print as `Infinity` (board follow-up),
+  but nothing else. `decorate` plugin output is raw SVG and stays the
+  plugin's responsibility. Both producers emit numeric bounds (tosijs
+  `describe()` `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields).
+  **tosijs vendors this file**: its next re-vendor picks the fix up.
+
+### Verdict changes — same input, different answer
+
+Same input, different `undersized` answer from `schematic()`. Only input
+that broke its declared types is affected. `isInteractive` and
+`targetSizeFinding` themselves are unchanged.
+
+- **Records with non-finite or string `bounds`** (`x: '10'`, NaN,
+  Infinity) are no longer drawn, so they no longer get a legend entry or
+  an `undersized` verdict.
+- **A `targetSize` that can't become a number** (`'big'`, NaN, an
+  object) now means the default, 24. In 0.5.0 the comparisons against it
+  were all false, so the audit was silently off. Config-shaped values keep
+  their 0.5.0 meaning: `'44'` is 44, and `'0'` or `null` is off.
 
 ### Measured
 
-- `dist/index.js`: 17,970 → 18,440 bytes (+470, +2.6%); gzip 5,433 → 5,553
-  (+120). Cost: the finite-geometry guards (#2739). Measured with
-  `gzip -9` against the published 0.5.0 tarball.
+- `dist/index.js`: 17,970 → 18,857 bytes (+887, +4.9%); gzip 5,433 → 5,650
+  (+217). Cost: the input-contract guards (#2739). Measured with `gzip -9`
+  against the published 0.5.0 tarball.
 
 ### Fixed
 
