@@ -382,37 +382,24 @@ export const targetSizeFinding = (
     : null
 }
 
-// geometry fails closed: every coordinate is interpolated into SVG
-// attributes, so only numbers may reach them. Two input contracts:
-// RECORDS are untrusted producer data — bounds that aren't finite numbers
-// are not drawn (a string x on a viewportFixed record skipped every
-// arithmetic check and landed in x="…" verbatim: attribute injection).
-// OPTIONS are the integrator's own config — coerced as 0.5.0's arithmetic
-// coerced them ('44' is 44, null is 0), so every option value that drew
-// correctly still draws identically; only what cannot become a number
-// falls back to the default (or, for `within`, draws nothing)
+// geometry fails closed: coordinates are interpolated into SVG attributes,
+// so a value of the WRONG TYPE (a string, an object — anything whose text
+// isn't a number's) must never reach one (#2739: a string x on a
+// viewportFixed record landed in x="…" verbatim — attribute injection).
+// RECORDS are untrusted producer data: bounds that aren't finite numbers
+// are not drawn. OPTIONS of the declared type behave exactly as in 0.5.0
+// (numbers of any value, null, absent — pinned byte-for-byte by
+// tools/byte-stability.ts); only the options that PRINT (pad, fontSize,
+// within) are guarded, and only against the wrong type. maxCaption,
+// minLabelHeight and targetSize feed comparisons and slice() alone.
 const finiteBounds = (b: SchematicBounds): boolean =>
   Number.isFinite(b.x) &&
   Number.isFinite(b.y) &&
   Number.isFinite(b.width) &&
   Number.isFinite(b.height)
 
-const optionNumber = (value: unknown, fallback: number): number => {
-  if (value === undefined || typeof value === 'symbol') return fallback
-  const n = Number(value)
-  return Number.isFinite(n) ? n : fallback
-}
-
-// a crop region, coerced like any option; null when it can't be one
-const optionBounds = (b: SchematicBounds): SchematicBounds | null => {
-  const box = {
-    x: optionNumber(b.x, NaN),
-    y: optionNumber(b.y, NaN),
-    width: optionNumber(b.width, NaN),
-    height: optionNumber(b.height, NaN),
-  }
-  return finiteBounds(box) ? box : null
-}
+const printable = (value: unknown): boolean =>
+  value == null || typeof value === 'number'
 
 const intersects = (a: SchematicBounds, b: SchematicBounds): boolean =>
   a.x < b.x + b.width &&
@@ -489,22 +476,27 @@ export const schematic = (
   options: SchematicOptions = {}
 ): SchematicResult => {
   const {
+    minLabelHeight = 14,
+    maxCaption = 36,
+    within,
     index: showIndex = false,
+    targetSize = TARGET_SIZE_DEFAULT,
     legendNote = true,
     decorate,
   } = options
-  // numeric options reach SVG attributes too (font-size, the viewBox,
-  // pinned offsets) — coerced, never emitted raw (see optionNumber)
-  const pad = optionNumber(options.pad, 8)
-  const minLabelHeight = optionNumber(options.minLabelHeight, 14)
-  const maxCaption = optionNumber(options.maxCaption, 36)
-  const fontSize = optionNumber(options.fontSize, 11)
-  const targetSize = optionNumber(options.targetSize, TARGET_SIZE_DEFAULT)
-  const within = options.within == null ? undefined : optionBounds(options.within)
+  // the options that print: the wrong type falls back to the default
+  const pad = options.pad === undefined || !printable(options.pad) ? 8 : options.pad
+  const fontSize =
+    options.fontSize === undefined || !printable(options.fontSize) ? 11 : options.fontSize
   const legend: SchematicLegendEntry[] = []
-  // an unusable region draws nothing rather than silently widening the
-  // crop to the whole map
-  const withinOk = within !== null
+  // a region of the wrong type draws nothing rather than silently
+  // widening the crop to the whole map
+  const withinOk =
+    within == null ||
+    (printable(within.x) &&
+      printable(within.y) &&
+      printable(within.width) &&
+      printable(within.height))
   const boxes = description.wiring.filter(
     (w) =>
       withinOk &&

@@ -1150,34 +1150,34 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
     }
   }
 
-  test('a non-finite within draws nothing rather than the whole map', () => {
+  // OPTIONS: the declared type (any number, null, absent) draws exactly as
+  // 0.5.0 did — pinned byte-for-byte against the published release by the
+  // option grid in tools/byte-stability.ts, which unit tests can't reach.
+  // Here: the WRONG type never reaches an attribute.
+  const wrongType: Record<string, unknown> = {
+    'attribute-injecting string': '1" onmouseover="alert(1)" a="',
+    'text-injecting string': '1"/><text>forged ⟷ app.secret</text><rect y="',
+    'numeric string': '10',
+    'injecting array': ['1" onmouseover="alert(1)" a="'],
+    'injecting object': { toString: () => '1" onmouseover="alert(1)" a="' },
+  }
+  const clean = (svg: string) => {
+    expect(svg).not.toContain('onmouseover')
+    expect(svg).not.toContain('forged')
+  }
+
+  test('a within of the wrong type draws nothing rather than the whole map', () => {
     const plain = map(ok.bounds, true)
     expect(schematicSVG(plain)).toContain('safe') // positive control
-    // within is an OPTION: a numeric string coerces (asserted below), so
-    // only values that can't become a number are hostile here
-    for (const bad of Object.values(hostile).filter((v) => !Number.isFinite(Number(v)))) {
+    for (const bad of Object.values(wrongType)) {
       for (const field of ['x', 'y', 'width', 'height']) {
-        const svg = schematicSVG(plain, { within: { x: 0, y: 0, width: 100, height: 100, [field]: bad } })
+        const svg = schematicSVG(plain, { within: { x: 0, y: 0, width: 100, height: 100, [field]: bad } as any })
         expect(svg).not.toContain('safe')
-        expect(svg).not.toContain('onmouseover')
-        expect(svg).not.toMatch(/NaN|Infinity/)
+        clean(svg)
       }
     }
   })
 
-  test('within coerces like any option: numeric strings are the number', () => {
-    const plain = map(ok.bounds, false)
-    const region = { x: 0, y: 0, width: 100, height: 100 }
-    expect(schematicSVG(plain, { within: { x: '0', y: '0', width: '100', height: '100' } as any })).toBe(
-      schematicSVG(plain, { within: region })
-    )
-  })
-
-  // options reach attributes too (font-size, the viewBox, pinned offsets,
-  // the legend footer). They are the integrator's config, coerced as 0.5.0's
-  // arithmetic coerced them: a value that becomes a finite number draws as
-  // that number; anything else falls back to the default. (0.5.0
-  // byte-equality for config-shaped values is pinned in tools/byte-stability.ts.)
   const flagged: SchematicDescription = {
     exposure: 'introspection',
     roots: { a: 'object' },
@@ -1187,30 +1187,39 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
       { tag: 'nav', text: 'pinned', on: { click: 'a.go' }, viewportFixed: true, bounds: { x: 0, y: 0, width: 80, height: 20 } },
     ],
   }
-  test('targetSize keeps its 0.5.0 meaning for config-shaped values (round-3 review)', () => {
-    const small = { ...flagged, wiring: [{ ...ok, bounds: { x: 10, y: 10, width: 20, height: 20 } }] }
-    const undersized = (o: object) => schematic(small, o).legend.some((e) => e.undersized != null)
-    expect(undersized({ targetSize: 44 })).toBe(true) // positive control
-    expect(undersized({ targetSize: '44' })).toBe(true) // the audit must not fail open
-    expect(undersized({ targetSize: null })).toBe(false) // null was off in 0.5.0
-    expect(undersized({ targetSize: '0' })).toBe(false)
-    expect(undersized({ targetSize: 'big' })).toBe(true) // garbage → the default (24), never off
-  })
-
-  for (const option of ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']) {
-    for (const [name, bad] of Object.entries(hostile)) {
+  // the options that PRINT: the wrong type is the default drawing
+  for (const option of ['pad', 'fontSize']) {
+    for (const [name, bad] of Object.entries(wrongType)) {
       for (const within of [undefined, { x: 0, y: 0, width: 200, height: 100 }]) {
-        test(`${name} as options.${option}${within ? ' (within)' : ''} draws as its number, or the default`, () => {
+        test(`${name} as options.${option}${within ? ' (within)' : ''} is the default drawing`, () => {
           const baseline = schematicSVG(flagged, { within })
           expect(baseline).toContain('safe') // positive control
-          const n = Number(bad)
-          const expected = Number.isFinite(n) ? schematicSVG(flagged, { within, [option]: n }) : baseline
-          const svg = schematicSVG(flagged, { within, [option]: bad })
-          expect(svg).toBe(expected)
-          expect(svg).not.toContain('onmouseover')
-          expect(svg).not.toMatch(/NaN|Infinity/)
+          const svg = schematicSVG(flagged, { within, [option]: bad } as any)
+          expect(svg).toBe(baseline)
+          clean(svg)
         })
       }
     }
   }
+  // the options that never print keep 0.5.0's arithmetic — '44' is 44 —
+  // and can't inject whatever they hold
+  for (const option of ['minLabelHeight', 'maxCaption', 'targetSize']) {
+    test(`options.${option} cannot inject, whatever its type`, () => {
+      for (const bad of Object.values(wrongType)) clean(schematicSVG(flagged, { [option]: bad } as any))
+    })
+  }
+
+  test('targetSize keeps its 0.5.0 meaning (rounds 3 and 4)', () => {
+    const small = { ...flagged, wiring: [{ ...ok, bounds: { x: 10, y: 10, width: 20, height: 20 } }] }
+    const undersized = (o: object) => schematic(small, o as any).legend.some((e) => e.undersized != null)
+    expect(undersized({})).toBe(true) // positive control: 20 < the default 24
+    expect(undersized({ targetSize: 44 })).toBe(true)
+    expect(undersized({ targetSize: '44' })).toBe(true) // the audit must not fail open
+    expect(undersized({ targetSize: Infinity })).toBe(true)
+    expect(undersized({ targetSize: 16 })).toBe(false)
+    expect(undersized({ targetSize: 0 })).toBe(false)
+    expect(undersized({ targetSize: '0' })).toBe(false)
+    expect(undersized({ targetSize: null })).toBe(false) // null was off in 0.5.0
+    expect(undersized({ targetSize: -Infinity })).toBe(false)
+  })
 })

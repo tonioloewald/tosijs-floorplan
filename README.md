@@ -239,10 +239,11 @@ geometry genuinely runs out.
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);
 `index: true` (stamp record indexes); `targetSize` (the undersized-audit
 floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
-the footer strip); `decorate` (below). Options are the integrator's config and
-coerce like numbers (`'44'` is 44, `null` is 0). A numeric option that
-can't become a finite number falls back to its default. A `within` that
-can't become a rect renders an empty map, rather than the whole one.
+the footer strip); `decorate` (below). A `pad` or `fontSize` that isn't a
+number (a string, array or object) is its default, and a `within` with
+such a field renders an empty map, rather than the whole one. These are
+the options that print into the SVG. Every other option value behaves as
+it always has.
 
 ## Plugins (EXPERIMENTAL)
 
@@ -250,7 +251,9 @@ can't become a rect renders an empty map, rather than the whole one.
 its `<g>` closes, with the record, its resolved geometry, and an `emit`
 function. The corner slots already spoken for: **top-left** invalid flag,
 **top-right** index, **bottom-right** `↔` badge, **outline** focus/emphasis.
-Claim empty real estate:
+`emit` takes raw SVG. The core guarantees that only escaped text and numbers
+reach its attributes, but that doesn't cover what a plugin emits: escape
+anything you interpolate from the record. Claim empty real estate:
 
 ```js
 schematicSVG(map, {

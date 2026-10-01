@@ -114,30 +114,27 @@ if (existsSync(localDist)) {
   )
 }
 
-// option values the integrator may pass as config (strings from a query
-// string, null for "unset"): every one 0.5.0 drew correctly must draw
-// byte-identically — 0.5.1's fail-closed coercion may only change values
-// that never produced a valid drawing (round-3 review: a strict check made
-// targetSize '44' silently fall back to 24, failing the audit open)
-const OPTION_CASES: Record<string, object> = {
-  'targetSize "44"': { targetSize: '44' },
-  'targetSize "0"': { targetSize: '0' },
-  'targetSize null': { targetSize: null },
-  'pad null': { pad: null },
-  'minLabelHeight null': { minLabelHeight: null },
-  'minLabelHeight "40"': { minLabelHeight: '40' },
-  'maxCaption "8"': { maxCaption: '8' },
-}
+// options of the DECLARED type must draw byte-identically to the published
+// release — every option × every edge a number can take (plus null and
+// absent), over form (layout) and sink (an 18×18 button, so the target-size
+// audit has something to say). A grid, not hand-picked cases: rounds 2-4 of
+// the 0.5.1 review each found a value the hand-picked list missed.
+const EDGES: unknown[] = [0, -1, 1, 7.5, 44, 1e308, -1e308, NaN, Infinity, -Infinity, null, undefined]
+const OPTIONS = ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']
 const RUNS: [string, object, object | undefined][] = Object.entries(FIXTURES).map(
   ([name, map]) => [name, map, undefined]
 )
-// form for layout options; sink carries an 18×18 button, so the target-size
-// audit has something to say
-for (const [name, options] of Object.entries(OPTION_CASES))
-  for (const fixture of ['form', 'sink'])
-    RUNS.push([`${fixture} + ${name}`, FIXTURES[fixture], options])
+const grid: [string, object][] = []
+for (const option of OPTIONS)
+  for (const edge of EDGES) grid.push([`${option}: ${String(edge)}`, { [option]: edge }])
+for (const field of ['x', 'y', 'width', 'height'])
+  for (const edge of EDGES)
+    grid.push([`within.${field}: ${String(edge)}`, { within: { x: 0, y: 0, width: 300, height: 400, [field]: edge } }])
+for (const fixture of ['form', 'sink'])
+  for (const [name, options] of grid) RUNS.push([`${fixture} + ${name}`, FIXTURES[fixture], options])
 
 let failed = false
+let gridPassed = 0
 for (const [name, map, options] of RUNS) {
   const before = published.schematicSVG(map, options)
   const after = head.schematicSVG(map, options)
@@ -157,7 +154,8 @@ for (const [name, map, options] of RUNS) {
         (before === after ? ' (bytes currently identical)' : ' (bytes DIFFER — investigate before deleting)')
     )
   } else if (before === after) {
-    console.log(`✅ ${name}: byte-identical to published ${published_name}`)
+    if (options === undefined) console.log(`✅ ${name}: byte-identical to published ${published_name}`)
+    else gridPassed++
   } else if (licenseLive) {
     console.log(`⚠️  ${name}: differs — licensed by "${license.reason}"`)
   } else {
@@ -169,6 +167,8 @@ for (const [name, map, options] of RUNS) {
     console.log(`   HEAD:      …${after.slice(Math.max(0, at - 40), at + 40)}…`)
   }
 }
+const gridRuns = RUNS.length - Object.keys(FIXTURES).length
+console.log(`${gridPassed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} byte-identical`)
 if (failed) {
   console.log(
     '\nOutput changed for an unchanged input. Either revert the drift, or ' +

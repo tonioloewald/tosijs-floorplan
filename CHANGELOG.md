@@ -10,48 +10,49 @@ are documented here
 
 - **Geometry fails closed** (board #2739, found by this release's pre-tag
   review; present in 0.5.0 and earlier). Coordinates are written into SVG
-  attributes, and data that wasn't a number could inject markup. On a
+  attributes, and a value of the wrong type could inject markup. On a
   `viewportFixed` record, a string `x`/`y` skipped every arithmetic check
   and was written verbatim into `x="…"`/`y="…"`, so `'1" onmouseover="…'`
   added an attribute and a hostile `y` could add a forged `<text>`,
   defeating the `secret` and forged-glyph guarantees. The `pad` and
-  `fontSize` options reached `font-size`, the viewBox and the pinned
-  offsets the same way. Two input contracts now close it:
+  `fontSize` options and `within` reached the viewBox, `font-size` and the
+  pinned offsets the same way. Now:
   - **Records** are untrusted producer data. A record whose `bounds` has
     any field that isn't a finite number (NaN, Infinity, any string, even
     `'10'`) is **not drawn**.
-  - **Options** are the integrator's own config, coerced as 0.5.0's
-    arithmetic coerced them (`'44'` is 44, `null` is 0). Every option
-    value that drew correctly in 0.5.0 draws byte-identically, which
-    `bun run stability` now pins. A value that can't become a number
-    falls back to the default. A `within` that can't become a rect draws
-    an empty map, rather than the whole one.
+  - **Options of the declared type are untouched.** Any number (including
+    NaN and ±Infinity), `null` or an absent option draws byte-identically
+    to 0.5.0. `bun run stability` pins this over a grid: 5 numeric options,
+    plus `within`'s 4 fields, × 12 edge values × 2 fixtures, 216 runs.
+  - Only the options that print are guarded, and only against the wrong
+    type: a `pad` or `fontSize` that isn't a number primitive (a string,
+    even `'12'`; a boolean; an array; any object, `Number` wrappers
+    included) is its default, and a `within` with such a field draws an empty map,
+    rather than the whole one. These are the only option values whose
+    output changes. In 0.5.0, strings concatenated into the geometry
+    (`fontSize + 2` → `'122'`); `true` and wrappers drew as numbers.
+    `maxCaption`, `minLabelHeight` and
+    `targetSize` never reach an attribute and keep 0.5.0's arithmetic
+    (`targetSize: '44'` is still 44).
 
-  What reaches an attribute is now escaped text or a JS number's text.
-  An overflowing number can still print as `Infinity` (board follow-up),
-  but nothing else. `decorate` plugin output is raw SVG and stays the
-  plugin's responsibility. Both producers emit numeric bounds (tosijs
-  `describe()` `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields).
-  **tosijs vendors this file**: its next re-vendor picks the fix up.
+  `decorate` plugin output is raw SVG and stays the plugin's
+  responsibility. Both producers emit numeric bounds (tosijs `describe()`
+  `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields). **tosijs
+  vendors this file**: its next re-vendor picks the fix up.
 
 ### Verdict changes — same input, different answer
 
-Same input, different `undersized` answer from `schematic()`. Only input
-that broke its declared types is affected. `isInteractive` and
-`targetSizeFinding` themselves are unchanged.
-
 - **Records with non-finite or string `bounds`** (`x: '10'`, NaN,
   Infinity) are no longer drawn, so they no longer get a legend entry or
-  an `undersized` verdict.
-- **A `targetSize` that can't become a number** (`'big'`, NaN, an
-  object) now means the default, 24. In 0.5.0 the comparisons against it
-  were all false, so the audit was silently off. Config-shaped values keep
-  their 0.5.0 meaning: `'44'` is 44, and `'0'` or `null` is off.
+  an `undersized` verdict. In 0.5.0 they drew with broken geometry, and an
+  Infinity coordinate made the whole map unrenderable. `isInteractive` and
+  `targetSizeFinding` themselves are unchanged, and no option changes any
+  verdict.
 
 ### Measured
 
-- `dist/index.js`: 17,970 → 18,857 bytes (+887, +4.9%); gzip 5,433 → 5,650
-  (+217). Cost: the input-contract guards (#2739). Measured with `gzip -9`
+- `dist/index.js`: 17,970 → 18,505 bytes (+535, +3.0%); gzip 5,433 → 5,568
+  (+135). Cost: the input guards (#2739). Measured with `gzip -9`
   against the published 0.5.0 tarball.
 
 ### Fixed
