@@ -16,7 +16,9 @@ are documented here
 - **The tarball no longer ships `src/schematic.test.ts`**: `files` names
   `src/index.ts` (the file tosijs vendors) instead of all of `src/`. The
   test file's relative import could not resolve from the package, which
-  release-doctor flagged. dist/ is unchanged.
+  release-doctor flagged. `files` also excludes `dist/.*`, so a dotfile in
+  a local `dist/` (macOS dropped a Spotlight marker there) can't ship.
+  dist/ is unchanged.
 
 ### Changed
 
