@@ -1122,6 +1122,9 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
     'text-injecting y': '1"/><text>forged ⟷ app.secret</text><rect y="',
     NaN: NaN,
     Infinity: Infinity,
+    // a numeric STRING broke the declared type too; it used to draw (via
+    // coercion) and now doesn't — pinned so a coercing refactor fails here
+    'numeric string': '10',
   }
   const map = (bounds: any, viewportFixed: boolean): SchematicDescription => ({
     exposure: 'introspection',
@@ -1137,7 +1140,7 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
           const { svg, legend } = schematic(map({ ...ok.bounds, [field]: bad }, viewportFixed))
           // positive control first: the valid sibling still renders
           expect(svg).toContain('safe')
-          expect(legend.map((e) => e.text ?? e.label)).not.toContain('hostile')
+          expect(JSON.stringify(legend)).not.toContain('hostile')
           expect(svg).not.toContain('hostile')
           expect(svg).not.toContain('onmouseover')
           expect(svg).not.toContain('forged')
@@ -1151,10 +1154,36 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
     const plain = map(ok.bounds, true)
     expect(schematicSVG(plain)).toContain('safe') // positive control
     for (const bad of Object.values(hostile)) {
-      const svg = schematicSVG(plain, { within: { x: 0, y: bad, width: 100, height: 100 } })
-      expect(svg).not.toContain('safe')
-      expect(svg).not.toContain('onmouseover')
-      expect(svg).not.toMatch(/NaN|Infinity/)
+      for (const field of ['x', 'y', 'width', 'height']) {
+        const svg = schematicSVG(plain, { within: { x: 0, y: 0, width: 100, height: 100, [field]: bad } })
+        expect(svg).not.toContain('safe')
+        expect(svg).not.toContain('onmouseover')
+        expect(svg).not.toMatch(/NaN|Infinity/)
+      }
     }
   })
+
+  // options reach attributes too (font-size, the viewBox, pinned offsets,
+  // the legend footer): a non-finite numeric option falls back to its
+  // default — the drawing is exactly the default drawing
+  const flagged: SchematicDescription = {
+    exposure: 'introspection',
+    roots: { a: 'object' },
+    actions: ['a.go'],
+    wiring: [
+      { ...ok, flags: [{ kind: 'contrast', label: '2:1', severity: 'error' }] },
+      { tag: 'nav', text: 'pinned', on: { click: 'a.go' }, viewportFixed: true, bounds: { x: 0, y: 0, width: 80, height: 20 } },
+    ],
+  }
+  for (const option of ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']) {
+    for (const [name, bad] of Object.entries(hostile)) {
+      for (const within of [undefined, { x: 0, y: 0, width: 200, height: 100 }]) {
+        test(`${name} as options.${option}${within ? ' (within)' : ''} draws the default drawing`, () => {
+          const baseline = schematicSVG(flagged, { within })
+          expect(baseline).toContain('safe') // positive control
+          expect(schematicSVG(flagged, { within, [option]: bad })).toBe(baseline)
+        })
+      }
+    }
+  }
 })

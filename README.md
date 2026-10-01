@@ -75,7 +75,7 @@ One flat record per wired element. Producers may add fields beyond these —
 | `ref` | `string` | a durable, actionable handle from the producer (survives re-renders — an agent can *act* on it, where an index only *looks up*) |
 | `flags` | `{kind, label, severity?}[]` | computed verdicts about the element (contrast ratios, target sizes, …) |
 | `image` | `string` | data-URL snapshot of inline media, drawn in place — pixels a pure renderer can't obtain |
-| `bounds` | `{x, y, width, height}` | page-coordinate geometry — layout is part of the semantics; zero-size or absent = not drawn |
+| `bounds` | `{x, y, width, height}` | page-coordinate geometry — layout is part of the semantics; zero-size or absent = not drawn; any field not a finite number (NaN, Infinity, a string — even `'10'`) = not drawn (fail-closed: coordinates are written into SVG attributes) |
 | `label` | `string` | the accessible **name** (aria-label, resolved labelledby, `<label>` association, title, alt) |
 | `placeholder` | `string` | the hint — deliberately distinct from `label`: an empty input must never read as content |
 | `text` | `string` | textContent, static (`"foo"`) or bound (`"foo ⟵ path"`) |
@@ -239,7 +239,9 @@ geometry genuinely runs out.
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);
 `index: true` (stamp record indexes); `targetSize` (the undersized-audit
 floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
-the footer strip); `decorate` (below).
+the footer strip); `decorate` (below). A numeric option that is not a finite
+number falls back to its default. A `within` with any non-finite field
+renders an empty map, rather than the whole one.
 
 ## Plugins (EXPERIMENTAL)
 

@@ -9,17 +9,36 @@ are documented here
 ### Security
 
 - **Geometry fails closed** (board #2739, found by this release's pre-tag
-  review; present in 0.5.0 and earlier). A record whose `bounds` were not
-  finite numbers could inject SVG markup. On a `viewportFixed` record, a
-  string `x`/`y` skipped every arithmetic check and was written verbatim
-  into `x="…"`/`y="…"`, so `'1" onmouseover="…'` added an attribute and a
-  hostile `y` could add a forged `<text>`, defeating the `secret` and
-  forged-glyph guarantees. Such a record is now **not drawn**. A `within`
-  with non-finite fields draws nothing, rather than the whole map. Only
-  records that already broke their declared types change: numeric-string
-  bounds no longer draw either. Valid input is byte-identical to 0.5.0
-  (`bun run stability`), and `isInteractive`/`targetSizeFinding` are
-  unchanged, so no verdict changes.
+  review; present in 0.5.0 and earlier). Coordinates are written into SVG
+  attributes, and data that wasn't a finite number could inject markup. On a
+  `viewportFixed` record, a string `x`/`y` skipped every arithmetic check
+  and was written verbatim into `x="…"`/`y="…"`, so `'1" onmouseover="…'`
+  added an attribute and a hostile `y` could add a forged `<text>`,
+  defeating the `secret` and forged-glyph guarantees. The `pad` and
+  `fontSize` options reached `font-size`, the viewBox and the pinned
+  offsets the same way (found by the review's second round). The class is
+  now closed at both inputs:
+  - a **record** whose `bounds` has any non-finite field (NaN, Infinity, a
+    string, even `'10'`) is **not drawn**;
+  - a `within` with any non-finite field draws an empty map, rather than
+    the whole one;
+  - a numeric **option** (`pad`, `minLabelHeight`, `maxCaption`,
+    `fontSize`, `targetSize`) that isn't a finite number falls back to its
+    default.
+
+  Every unescaped attribute value now derives from those, or from a string
+  length times a constant. Only input that broke its declared types
+  changes. Both producers emit numeric bounds (tosijs `describe()`
+  `Math.round`s a `DOMRect`; haltija reads `DOMRect` fields). Valid input is
+  byte-identical to 0.5.0 (`bun run stability`), and `isInteractive`/
+  `targetSizeFinding` are unchanged, so no verdict changes. **tosijs
+  vendors this file**: its next re-vendor picks the fix up.
+
+### Measured
+
+- `dist/index.js`: 17,970 → 18,440 bytes (+470, +2.6%); gzip 5,433 → 5,553
+  (+120). Cost: the finite-geometry guards (#2739). Measured with
+  `gzip -9` against the published 0.5.0 tarball.
 
 ### Fixed
 

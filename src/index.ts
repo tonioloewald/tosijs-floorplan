@@ -392,6 +392,9 @@ const finiteBounds = (b: SchematicBounds): boolean =>
   Number.isFinite(b.width) &&
   Number.isFinite(b.height)
 
+const finiteOr = (value: unknown, fallback: number): number =>
+  Number.isFinite(value) ? (value as number) : fallback
+
 const intersects = (a: SchematicBounds, b: SchematicBounds): boolean =>
   a.x < b.x + b.width &&
   b.x < a.x + a.width &&
@@ -467,16 +470,19 @@ export const schematic = (
   options: SchematicOptions = {}
 ): SchematicResult => {
   const {
-    pad = 8,
-    minLabelHeight = 14,
-    maxCaption = 36,
-    fontSize = 11,
     within,
     index: showIndex = false,
-    targetSize = TARGET_SIZE_DEFAULT,
     legendNote = true,
     decorate,
   } = options
+  // numeric options reach SVG attributes too (font-size, the viewBox, pinned
+  // offsets): anything but a finite number falls back to the default, the
+  // same fail-closed rule records get from finiteBounds
+  const pad = finiteOr(options.pad, 8)
+  const minLabelHeight = finiteOr(options.minLabelHeight, 14)
+  const maxCaption = finiteOr(options.maxCaption, 36)
+  const fontSize = finiteOr(options.fontSize, 11)
+  const targetSize = finiteOr(options.targetSize, TARGET_SIZE_DEFAULT)
   const legend: SchematicLegendEntry[] = []
   // an unusable region draws nothing rather than silently widening the
   // crop to the whole map
