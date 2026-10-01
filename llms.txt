@@ -83,7 +83,7 @@ under rasterizers and never enter caption runs.
 
 - Output stability is a promise: unchanged input → unchanged SVG across
   patch releases; consumers snapshot-test the output.
-- tosijs vendors `src/index.ts` verbatim (hence `src/` ships in the npm
-  tarball and the source stays one self-contained file).
+- tosijs vendors `src/index.ts` verbatim (hence `src/index.ts` ships in
+  the npm tarball and the source stays one self-contained file).
 - `tosijs-schema` is a different package (JSON-schema validation); the
   name similarity is acknowledged and deliberate history.

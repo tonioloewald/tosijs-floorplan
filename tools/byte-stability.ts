@@ -12,7 +12,7 @@
  * WIRING: `bun run stability` — a MANDATORY pre-tag step, listed in
  * CLAUDE.md's commands. It is NOT in prepublishOnly (it needs the network)
  * and NOTHING runs it automatically — release-doctor has no project-local
- * preflight seam (asking for one is tracked in TODO.md); until that
+ * preflight seam (asking for one is virta board #2588); until that
  * exists, the human/agent cutting the tag runs this by hand.
  */
 import { mkdtempSync, rmSync, statSync, existsSync } from 'node:fs'
@@ -40,9 +40,9 @@ const FIXTURES: Record<string, object> = {
       { tag: 'button', text: 'x', on: { click: 'a.del' }, ref: '@9', flags: [{ kind: 'contrast', label: '2.3:1', severity: 'error' }], bounds: { x: 10, y: 300, width: 18, height: 18 } },
     ],
   },
-  // shapes whose VERDICT deliberately changed in 0.5.0 — these diverge
-  // from 0.4.0 by license; after 0.5.0 publishes they become byte pins
-  // for the new verdicts
+  // shapes whose VERDICT deliberately changed in 0.5.0 — byte pins for
+  // the new verdicts since 0.5.0 published (their 0.4.0-divergence
+  // licenses self-expired then)
   'verdict-list-select': {
     wiring: [
       { tag: 'select', list: { path: 'app.options', idPath: 'id' }, value: 'b ⟷ app.choice', bounds: { x: 10, y: 10, width: 20, height: 20 } },
