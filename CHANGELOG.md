@@ -18,6 +18,17 @@ are documented here
   `targetSizeFinding`. `style` was the only field that threw, and the test
   pins the rest. Valid input is byte-identical (`bun run stability`).
 
+### Security
+
+- **Each guarded value is read once** (board #2753; 0.5.1's guarantee
+  assumed plain data). Bounds, `within`, `pad`, `fontSize` and style
+  colours are now copied into locals once, and only the copy is checked
+  and drawn. Before, an in-process producer passing a getter or Proxy
+  could return a number to the check and markup to the print. That was
+  demonstrated on `viewportFixed` bounds `x`/`y`, and on `within.y`/
+  `within.height` through the legend footer. JSON-sourced records were
+  never affected. The README's plain-data caveat is lifted for the core.
+
 ## [0.5.1] - 2026-10-02
 
 ### Security

@@ -490,17 +490,29 @@ export const schematic = (
   const {
     minLabelHeight = 14,
     maxCaption = 36,
-    within,
+    within: withinIn,
     index: showIndex = false,
     targetSize = TARGET_SIZE_DEFAULT,
     legendNote = true,
     decorate,
   } = options
   // the options that print: the wrong type falls back to the default
-  const pad = options.pad === undefined || !printable(options.pad) ? 8 : options.pad
-  const fontSize =
-    options.fontSize === undefined || !printable(options.fontSize) ? 11 : options.fontSize
+  // each value READ ONCE (#2753): the value checked is the value printed,
+  // so a getter or Proxy can't pass the check and inject on a second read
+  const padIn = options.pad
+  const pad = padIn === undefined || !printable(padIn) ? 8 : padIn
+  const fontSizeIn = options.fontSize
+  const fontSize = fontSizeIn === undefined || !printable(fontSizeIn) ? 11 : fontSizeIn
   const legend: SchematicLegendEntry[] = []
+  const within: SchematicBounds | undefined =
+    withinIn == null
+      ? undefined
+      : {
+          x: withinIn.x,
+          y: withinIn.y,
+          width: withinIn.width,
+          height: withinIn.height,
+        }
   // a region of the wrong type draws nothing rather than silently
   // widening the crop to the whole map
   const withinOk =
@@ -509,21 +521,27 @@ export const schematic = (
       printable(within.y) &&
       printable(within.width) &&
       printable(within.height))
-  const boxes = description.wiring.filter(
-    (w) =>
-      withinOk &&
-      w.bounds != null &&
-      finiteBounds(w.bounds) &&
-      w.bounds.width > 0 &&
-      w.bounds.height > 0 &&
+  // record geometry, snapshotted once into plain numbers: everything below
+  // reads geometry.get(w), never w.bounds again
+  const geometry = new Map<SchematicRecord, SchematicBounds>()
+  const boxes = description.wiring.filter((w) => {
+    const b = w.bounds
+    if (!withinOk || b == null) return false
+    const g = { x: b.x, y: b.y, width: b.width, height: b.height }
+    if (!finiteBounds(g)) return false
+    geometry.set(w, g)
+    return (
+      g.width > 0 &&
+      g.height > 0 &&
       // fully negative coordinates = hidden by off-page positioning (the
       // spatial analog of zero-size): invisible to humans, invisible here
       (w.viewportFixed === true ||
-        (w.bounds.x + w.bounds.width > 0 && w.bounds.y + w.bounds.height > 0)) &&
+        (g.x + g.width > 0 && g.y + g.height > 0)) &&
       (within == null ||
         w.viewportFixed === true ||
-        intersects(w.bounds, within))
-  )
+        intersects(g, within))
+    )
+  })
   // viewport furniture (fixed/sticky) has viewport coordinates: it neither
   // stretches the viewBox nor sits at a page position — it gets PINNED as an
   // overlay at the map's origin, which is where it lives on screen
@@ -540,19 +558,19 @@ export const schematic = (
   const minX =
     within != null
       ? within.x - pad
-      : Math.min(...fitBoxes.map((w) => w.bounds!.x)) - pad
+      : Math.min(...fitBoxes.map((w) => geometry.get(w)!.x)) - pad
   const minY =
     within != null
       ? within.y - pad
-      : Math.min(...fitBoxes.map((w) => w.bounds!.y)) - pad
+      : Math.min(...fitBoxes.map((w) => geometry.get(w)!.y)) - pad
   const maxX =
     within != null
       ? within.x + within.width + pad
-      : Math.max(...fitBoxes.map((w) => w.bounds!.x + w.bounds!.width)) + pad
+      : Math.max(...fitBoxes.map((w) => geometry.get(w)!.x + geometry.get(w)!.width)) + pad
   const maxY =
     within != null
       ? within.y + within.height + pad
-      : Math.max(...fitBoxes.map((w) => w.bounds!.y + w.bounds!.height)) + pad
+      : Math.max(...fitBoxes.map((w) => geometry.get(w)!.y + geometry.get(w)!.height)) + pad
 
   // explicit width/height (not just viewBox): gives the svg an intrinsic
   // size as a document/img, and Firefox refuses to draw an svg image onto a
@@ -596,9 +614,9 @@ export const schematic = (
     const index = description.wiring.indexOf(w)
     const pinOffsetX = w.viewportFixed === true ? minX + pad : 0
     const pinOffsetY = w.viewportFixed === true ? minY + pad : 0
-    const x = w.bounds!.x + pinOffsetX
-    const y = w.bounds!.y + pinOffsetY
-    const { width, height } = w.bounds!
+    const x = geometry.get(w)!.x + pinOffsetX
+    const y = geometry.get(w)!.y + pinOffsetY
+    const { width, height } = geometry.get(w)!
     // a box that CONTAINS other drawn boxes is a container: its textContent
     // is its children's text concatenated, so a text-derived caption would
     // overprint the children's own captions — the children speak for
@@ -609,7 +627,7 @@ export const schematic = (
         (other) =>
           other !== w &&
           other.viewportFixed !== true &&
-          contains(w.bounds!, other.bounds!)
+          contains(geometry.get(w)!, geometry.get(other)!)
       )
     // caption truth, per control kind:
     // - checkbox/radio: the state is GEOMETRY (✕ in the box, dot in the
@@ -706,7 +724,8 @@ export const schematic = (
     // the toggle and inline-link exemptions, producer-flag supersession —
     // lives in the exported targetSizeFinding (issue #4: one
     // implementation, shared with tosijs's audit).
-    const undersized = targetSizeFinding(w, targetSize, {
+    // the snapshot, so the legend's size text is the geometry drawn
+    const undersized = targetSizeFinding({ ...w, bounds: geometry.get(w) }, targetSize, {
       honorProducerFlags: true,
     })
     const emphasis = structural

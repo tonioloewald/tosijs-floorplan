@@ -1276,3 +1276,54 @@ describe('a malformed record never denies the map (board #2748)', () => {
     expect(map(base())).toContain('fill="white"')
   })
 })
+
+describe('each guarded value is read once (board #2753)', () => {
+  // an in-process producer can hand over getters or Proxies: a value that
+  // is a number when checked and markup when printed must never print
+  const evil = '1" onmouseover="alert(1)" a="'
+  const turncoat = (honest: unknown) => {
+    let reads = 0
+    return { get: () => (reads++ === 0 ? honest : evil), enumerable: true }
+  }
+  const draw = (record: any, options: any = {}) =>
+    schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [record] }, options)
+  // cramped (10 px tall), so it rides the legend and the legend footer
+  // (y = maxY + 10) is drawn too
+  const record = () => ({
+    tag: 'button', text: 'b', on: { click: 'a.go' },
+    bounds: { x: 10, y: 10, width: 60, height: 10 },
+    style: { background: 'white', borderColor: 'gray', color: 'black' },
+    flags: [{ kind: 'contrast', label: '2:1', severity: 'warn' }],
+  })
+
+  for (const field of ['x', 'y', 'width', 'height']) {
+    for (const viewportFixed of [false, true]) {
+      test(`bounds.${field}${viewportFixed ? ' (viewportFixed)' : ''}`, () => {
+        const r: any = { ...record(), viewportFixed }
+        Object.defineProperty(r.bounds, field, turncoat(r.bounds[field]))
+        expect(draw(r)).not.toContain('onmouseover')
+      })
+    }
+  }
+  for (const field of ['x', 'y', 'width', 'height']) {
+    test(`within.${field}`, () => {
+      const within: any = { x: 0, y: 0, width: 300, height: 300 }
+      Object.defineProperty(within, field, turncoat(within[field]))
+      expect(draw({ ...record(), viewportFixed: true }, { within })).not.toContain('onmouseover')
+    })
+  }
+  for (const option of ['pad', 'fontSize']) {
+    test(`options.${option}`, () => {
+      const options: any = {}
+      Object.defineProperty(options, option, turncoat(option === 'pad' ? 8 : 11))
+      expect(draw({ ...record(), viewportFixed: true }, options)).not.toContain('onmouseover')
+    })
+  }
+  for (const key of ['background', 'borderColor', 'color']) {
+    test(`style.${key}`, () => {
+      const r: any = record()
+      Object.defineProperty(r.style, key, turncoat('white'))
+      expect(draw(r)).not.toContain('onmouseover')
+    })
+  }
+})
