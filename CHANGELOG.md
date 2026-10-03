@@ -6,60 +6,56 @@ are documented here
 
 ## [Unreleased]
 
+A narrow hardening patch. The pre-tag review blocked two broader cuts of
+these fixes (reviews/0.5.2-patch-review*.md); this release ships only what
+is sound, and says below what stays open.
+
+### Fixed
+
+- **A non-string `style` value no longer denies the whole map** (board
+  #2748, present in 0.5.0 and earlier). A record whose `style` (or its
+  `background`/`borderColor`/`color`) wasn't a string reached the escaper
+  and threw, so `schematic()` failed for every record. Such a value now
+  draws as if absent. A fuzz test covers every record field × seven wrong
+  types (number, object, array, null, boolean, function, symbol) on a
+  labelled button.
+
 ### Security
 
-- **Records are snapshotted once, at entry** (board #2753, #2748; the
-  0.5.2 pre-tag review blocked the first, field-by-field cut of both).
-  `schematic()`, `schematicSVG()`, `isInteractive()` and
-  `targetSizeFinding()` copy each record into a plain snapshot inside one
-  `try`, and judge and draw only the copy. That closes two classes at
-  once:
-  - **Read once.** No field is read twice, so a getter or Proxy can't
-    pass a check and change before the print. Shown on 0.5.1 code: an
-    `image` getter that answered `data:` to the check got an external
-    URL drawn as the `<image href>`, and `viewportFixed` bounds and
-    `within.y`/`within.height` (via the legend footer) printed markup.
-    `within`, `pad` and `fontSize` are read once too.
-  - **Never throws.** Primitives are kept verbatim, so 0.5.1's semantics
-    and coercions are unchanged. Symbols, functions and objects
-    (null-prototype and boxed strings included) in a scalar field read as
-    absent. A record whose read throws (a throwing getter, a trapping
-    Proxy) is skipped, and the rest of the map draws. A wiring that isn't
-    an array draws an empty map.
-  - **`esc()` refuses non-strings**, so no sink can be handed an object
-    with its own `replaceAll`.
+- **An `<image>` draws only the `data:` URI that was checked** (0.5.2
+  review). `image` is now read once. Before, a getter answering `data:` to
+  the check could get an external URL drawn as the `href`, so inlining or
+  rasterizing the SVG fetched it.
+- **Bounds, `within`, `pad`, `fontSize` and style colours are read once**
+  (board #2753), so a getter or Proxy can't pass their check and print
+  markup. Shown on 0.5.1 code: `viewportFixed` bounds `x`/`y`, and
+  `within.y`/`within.height` through the legend footer.
+- **`esc()` refuses non-strings** (anything else escapes to `''`), so no
+  sink can be handed an object with its own `replaceAll`.
 
-  JSON-sourced records were never exposed to the read-once holes. The
-  throws hit any producer: in 0.5.1, a non-string `style` value, a symbol
-  `tag` or `label`, or a null-prototype `label`/`ref` failed the whole
-  `schematic()` call.
+JSON-sourced records were never exposed to the read-once holes.
 
-  Evidence: a test runs 7 record shapes (input, secret, unlabeled, toggle,
-  container, flagged, image) × every field and nested field × 26 hostile
-  values (including accessors that turn at each of reads 1–10), plus
-  hostile wirings. `bun run stability` adds a record-field grid: every
-  field × 10 primitive values on 5 record shapes. All 1,418 runs where
-  0.5.1 didn't throw are identical in the result, `isInteractive` and
-  `targetSizeFinding` (32 runs where 0.5.1 threw are the fixed crashes).
-  The option grid (1,008 runs) is identical as well.
+### Not fixed in this release (tracked)
 
-### Changed — output for wrong-type input from in-process producers
+These need the record-snapshot redesign (board #2829), not more
+field-by-field patches:
+- Other fields are still read more than once, so the read-once guarantee
+  covers only the fields listed above. That includes flag `kind`/`label`.
+- A wrong-type value from an **in-process** producer can still throw in
+  some branches and deny the map. Examples: a symbol `tag` or `label`, a
+  null-prototype `label`/`ref`, or a flag getter that turns into a
+  non-string. JSON can't express any of these.
 
-- An object, function or symbol in a scalar field reads as absent. 0.5.1
-  stringified some of them (`label: {}` drew `[object Object]`; a
-  `new String('#fff')` style colour printed). No input of the declared
-  type changes, and no verdict changes for any primitive value.
-- `decorate` receives the producer's original record (with its custom
-  fields), not the snapshot. What a plugin emits stays its own
-  responsibility.
+The README's attribute guarantee stays scoped to plain-data input.
 
 ### Measured
 
-- `dist/index.js`: 18,505 → 21,369 bytes (+2,864, +15.5%); gzip 5,579 →
-  6,378 (+799). Cost: the record snapshot, the style guard and their
-  comments. The record-position lookup is now a map instead of
-  `indexOf` per record, so a 2,000-record map renders at 0.5.1's speed
-  (both around 25–30 ms on the release machine).
+- `dist/index.js`: 18,505 → 19,213 bytes (+708, +3.8%); gzip -9 5,579 →
+  5,798 (+219). Cost: the style guard, the read-once locals and their
+  comments.
+
+**tosijs pins this package exactly (`0.5.0`)**, so it needs a pin bump to
+0.5.2 to get this release, 0.5.1's #2739 fix included.
 
 ## [0.5.1] - 2026-10-02
 

@@ -236,81 +236,6 @@ const boundTwoWay = (v: unknown): boolean => {
 // appended binding, so these are excluded from the binding scan entirely
 // (0.4.0 review B1: a lone forged arrow in a never-bindable field is
 // always in "last = structural" position).
-// RECORDS ARE UNTRUSTED DATA, read exactly once (#2748, #2753). Every
-// public entry point copies each record into a plain snapshot inside one
-// try, and renders/judges only the copy, so no field is read twice (a
-// getter or Proxy can't pass a check and change before the print) and
-// nothing downstream can throw on a value of the wrong type (one malformed
-// record can't deny the map: a record whose read throws is skipped).
-// Primitives are kept VERBATIM (0.5.1's semantics, coercions included);
-// symbols, functions and objects in scalar fields read as absent; the
-// structured fields are copied as plain values. Unknown fields are kept
-// (the binding scan reads every field), and a known field that wasn't an
-// own enumerable one stays non-enumerable, so Object.entries sees exactly
-// what it saw on the original.
-const scalar = (v: unknown): unknown =>
-  v === null ||
-  (typeof v !== 'object' && typeof v !== 'function' && typeof v !== 'symbol')
-    ? v
-    : undefined
-
-const plainOf = (v: unknown, keys: string[]): unknown => {
-  if (v === null || typeof v !== 'object') return scalar(v)
-  const copy: Record<string, unknown> = {}
-  for (const key of keys) copy[key] = scalar((v as Record<string, unknown>)[key])
-  return copy
-}
-
-// only presence is read (`!= null`); a string still feeds the binding scan
-const presence = (v: unknown): unknown =>
-  v == null || typeof v === 'string' ? v : {}
-
-const STRUCTURED: Record<string, (v: unknown) => unknown> = {
-  bounds: (v) => plainOf(v, ['x', 'y', 'width', 'height']),
-  style: (v) => plainOf(v, ['background', 'borderColor', 'color']),
-  flags: (v) =>
-    Array.isArray(v)
-      ? Array.from(v, (f) => plainOf(f, ['kind', 'label', 'severity']))
-      : scalar(v),
-  on: presence,
-  list: presence,
-}
-
-const RECORD_KEYS = [
-  'tag', 'id', 'part', 'role', 'label', 'placeholder', 'type', 'checked',
-  'focused', 'invalid', 'required', 'disabled', 'contentEditable',
-  'description', 'text', 'on', 'list', 'bounds', 'viewportFixed',
-  'structural', 'style', 'ref', 'flags', 'image', 'href', 'value',
-  'interactive', 'editable', 'secret',
-]
-const KNOWN_KEYS = new Set(RECORD_KEYS)
-
-const readRecord = (raw: unknown): SchematicRecord | null => {
-  try {
-    if (raw === null || typeof raw !== 'object') return null
-    const source = raw as Record<string, unknown>
-    const own = new Set(Object.keys(source))
-    const copy: Record<string, unknown> = {}
-    for (const key of RECORD_KEYS) {
-      if (!(key in source)) continue
-      const v = source[key]
-      const value = STRUCTURED[key] ? STRUCTURED[key](v) : scalar(v)
-      if (own.has(key)) copy[key] = value
-      else
-        Object.defineProperty(copy, key, {
-          value,
-          enumerable: false,
-          writable: true,
-          configurable: true,
-        })
-    }
-    for (const key of own) if (!KNOWN_KEYS.has(key)) copy[key] = scalar(source[key])
-    return copy as unknown as SchematicRecord
-  } catch {
-    return null
-  }
-}
-
 const NEVER_BOUND = new Set([
   'tag', 'id', 'part', 'role', 'label', 'placeholder', 'type',
   'description', 'href', 'ref', 'image',
@@ -383,12 +308,7 @@ const isGround = (w: SchematicRecord): boolean =>
  * producer's own `interactive`/`editable` assertion (issue #3). Ground
  * (structure, list containers) is never interactive.
  */
-export const isInteractive = (w: SchematicRecord): boolean => {
-  const record = readRecord(w)
-  return record != null && interactive(record)
-}
-
-const interactive = (w: SchematicRecord): boolean =>
+export const isInteractive = (w: SchematicRecord): boolean =>
   !isGround(w) && (hasActEvidence(w) || hasEditEvidence(w))
 
 /** the WCAG 2.5.8 audit floor (24×24, the AA minimum) — one constant so
@@ -428,18 +348,9 @@ export const TARGET_FLAG_KINDS: ReadonlySet<string> = new Set([
 export const targetSizeFinding = (
   w: SchematicRecord,
   targetSize = TARGET_SIZE_DEFAULT,
-  options: { honorProducerFlags?: boolean } = {}
-): string | null => {
-  const record = readRecord(w)
-  return record == null ? null : targetSizeOf(record, targetSize, options)
-}
-
-const targetSizeOf = (
-  w: SchematicRecord,
-  targetSize = TARGET_SIZE_DEFAULT,
   { honorProducerFlags = false } = {}
 ): string | null => {
-  if (targetSize <= 0 || w.bounds == null || !interactive(w)) return null
+  if (targetSize <= 0 || w.bounds == null || !isInteractive(w)) return null
   const { width, height } = w.bounds
   // hidden is not small (#9): a 0×0 (or unlaid-out) element is not a
   // target too small to hit — the guard lives here so callers passing raw
@@ -504,8 +415,8 @@ const contains = (outer: SchematicBounds, inner: SchematicBounds): boolean =>
 
 // string args (not regexes) — tjs convert's lexer mis-reads a quote inside a
 // regex literal (/"/g) as a string opener; see tjs-lang issue
-// a sink that trusts its input's type is one turncoat away from raw markup
-// (an object with its own replaceAll): anything but a string escapes to ''
+// a sink that trusts its input's type can be handed an object with its
+// own replaceAll: anything but a string escapes to '' (0.5.2 review)
 const esc = (s: unknown): string =>
   typeof s !== 'string'
     ? ''
@@ -614,23 +525,15 @@ export const schematic = (
       printable(within.y) &&
       printable(within.width) &&
       printable(within.height))
-  // the wiring, read once, each record snapshotted once (readRecord); a
-  // wiring that isn't an array, or whose read throws, is an empty map
-  let raws: unknown[] = []
-  try {
-    const wiringIn: unknown = description.wiring
-    raws = Array.isArray(wiringIn) ? Array.from(wiringIn) : []
-  } catch {
-    raws = []
-  }
-  const records = raws.map(readRecord)
-  // a snapshot's position in the wiring (snapshots are unique objects, so a
-  // record object listed twice keeps both of its indexes)
-  const indexOf = new Map(records.map((r, i) => [r, i]))
-  const boxes = records.filter((w): w is SchematicRecord => {
-    if (w == null) return false
-    const g = w.bounds // a plain snapshot (readRecord): stable to re-read
-    if (!withinOk || g == null || !finiteBounds(g)) return false
+  // record geometry, snapshotted once into plain numbers: everything below
+  // reads geometry.get(w), never w.bounds again
+  const geometry = new Map<SchematicRecord, SchematicBounds>()
+  const boxes = description.wiring.filter((w) => {
+    const b = w.bounds
+    if (!withinOk || b == null) return false
+    const g = { x: b.x, y: b.y, width: b.width, height: b.height }
+    if (!finiteBounds(g)) return false
+    geometry.set(w, g)
     return (
       g.width > 0 &&
       g.height > 0 &&
@@ -659,19 +562,19 @@ export const schematic = (
   const minX =
     within != null
       ? within.x - pad
-      : Math.min(...fitBoxes.map((w) => w.bounds!.x)) - pad
+      : Math.min(...fitBoxes.map((w) => geometry.get(w)!.x)) - pad
   const minY =
     within != null
       ? within.y - pad
-      : Math.min(...fitBoxes.map((w) => w.bounds!.y)) - pad
+      : Math.min(...fitBoxes.map((w) => geometry.get(w)!.y)) - pad
   const maxX =
     within != null
       ? within.x + within.width + pad
-      : Math.max(...fitBoxes.map((w) => w.bounds!.x + w.bounds!.width)) + pad
+      : Math.max(...fitBoxes.map((w) => geometry.get(w)!.x + geometry.get(w)!.width)) + pad
   const maxY =
     within != null
       ? within.y + within.height + pad
-      : Math.max(...fitBoxes.map((w) => w.bounds!.y + w.bounds!.height)) + pad
+      : Math.max(...fitBoxes.map((w) => geometry.get(w)!.y + geometry.get(w)!.height)) + pad
 
   // explicit width/height (not just viewBox): gives the svg an intrinsic
   // size as a document/img, and Firefox refuses to draw an svg image onto a
@@ -701,8 +604,8 @@ export const schematic = (
   // affordance is then a fact about the page, not the producer's eyes.
   const blind =
     boxes.some((w) => !isGround(w)) &&
-    !records.some((r) => r != null && interactive(r)) &&
-    !records.some((r) => r != null && hasCapabilityEvidence(r))
+    !description.wiring.some(isInteractive) &&
+    !description.wiring.some(hasCapabilityEvidence)
   const note = blind
     ? 'no record carries affordance evidence (on, href, contentEditable, ' +
       'a two-way binding, or an interactive/editable assertion), and none ' +
@@ -712,12 +615,12 @@ export const schematic = (
       'should assert `interactive`/`editable` per record (see README)'
     : undefined
   for (const w of drawOrder) {
-    const index = indexOf.get(w)!
+    const index = description.wiring.indexOf(w)
     const pinOffsetX = w.viewportFixed === true ? minX + pad : 0
     const pinOffsetY = w.viewportFixed === true ? minY + pad : 0
-    const x = w.bounds!.x + pinOffsetX
-    const y = w.bounds!.y + pinOffsetY
-    const { width, height } = w.bounds!
+    const x = geometry.get(w)!.x + pinOffsetX
+    const y = geometry.get(w)!.y + pinOffsetY
+    const { width, height } = geometry.get(w)!
     // a box that CONTAINS other drawn boxes is a container: its textContent
     // is its children's text concatenated, so a text-derived caption would
     // overprint the children's own captions — the children speak for
@@ -728,7 +631,7 @@ export const schematic = (
         (other) =>
           other !== w &&
           other.viewportFixed !== true &&
-          contains(w.bounds!, other.bounds!)
+          contains(geometry.get(w)!, geometry.get(other)!)
       )
     // caption truth, per control kind:
     // - checkbox/radio: the state is GEOMETRY (✕ in the box, dot in the
@@ -742,6 +645,10 @@ export const schematic = (
     // truthy non-boolean secret (secret: 1 from mangled producer JSON)
     // must scrub, not leak — every redaction gate shares this coercion
     const secret = Boolean(w.secret)
+    // read ONCE: the data:-only gate below must judge the value that is
+    // drawn, or a getter answering 'data:' to the check gets an external
+    // URL fetched by the <image> (0.5.2 review B1)
+    const image = w.image
     let caption: string
     let hint = false
     if (secret) {
@@ -811,8 +718,8 @@ export const schematic = (
     const drawImage =
       !structural &&
       !secret && // B1: withheld pixels never draw
-      typeof w.image === 'string' &&
-      w.image.startsWith('data:')
+      typeof image === 'string' &&
+      image.startsWith('data:')
     // CRAMPED: the box can't legibly carry its dress — draw it bare (shape,
     // state geometry, emphasis, focus) with an auto stamp pointing into the
     // legend, where the metadata actually lives. Toggles are exempt from
@@ -826,7 +733,7 @@ export const schematic = (
     // lives in the exported targetSizeFinding (issue #4: one
     // implementation, shared with tosijs's audit).
     // the snapshot, so the legend's size text is the geometry drawn
-    const undersized = targetSizeOf(w, targetSize, {
+    const undersized = targetSizeFinding({ ...w, bounds: geometry.get(w) }, targetSize, {
       honorProducerFlags: true,
     })
     const emphasis = structural
@@ -865,7 +772,7 @@ export const schematic = (
       if (drawImage) {
         parts.push(
           `<image x="${x + 1}" y="${y + 1}" width="${width - 2}" ` +
-            `height="${height - 2}" href="${esc(w.image as string)}" ` +
+            `height="${height - 2}" href="${esc(image)}" ` +
             `preserveAspectRatio="xMidYMid meet"/>`
         )
       }
@@ -1071,9 +978,7 @@ export const schematic = (
     }
     if (decorate != null) {
       decorate({
-        // the producer's own record: plugins see their custom fields, and
-        // what a plugin emits is its own responsibility (README)
-        record: raws[index] as SchematicRecord,
+        record: w,
         index,
         x,
         y,
@@ -1099,7 +1004,7 @@ export const schematic = (
   const descBits: string[] = []
   if (legend.length > 0) {
     descBits.push(
-      `${raws.length} records; ${legend.length} ` +
+      `${description.wiring.length} records; ${legend.length} ` +
         'legend entries carry metadata the drawing could not — pair this ' +
         'image with its legend JSON (schematic().legend), matched by the ' +
         'stamped number / data-record index.'
