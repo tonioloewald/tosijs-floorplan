@@ -1223,3 +1223,56 @@ describe('geometry fails closed (0.5.1 — board #2739)', () => {
     expect(undersized({ targetSize: -Infinity })).toBe(false)
   })
 })
+
+describe('a malformed record never denies the map (board #2748)', () => {
+  // records are untrusted multi-producer data: one record breaking its
+  // declared types must not throw — the rest of the map still draws
+  const good = { tag: 'button', text: 'still here', on: { click: 'a.go' }, bounds: { x: 100, y: 10, width: 80, height: 30 } }
+  const base = (): any => ({
+    tag: 'button', text: 'ok', label: 'L', on: { click: 'a.go' },
+    bounds: { x: 10, y: 10, width: 60, height: 30 },
+    style: { background: 'white', borderColor: 'gray', color: 'black' },
+    flags: [{ kind: 'contrast', label: '2:1', severity: 'warn' }],
+  })
+  const wrong: Record<string, unknown> = {
+    number: 5, object: { a: 1 }, array: ['x'], null: null, true: true,
+    function: () => 1, symbol: Symbol('s'),
+  }
+  // every top-level field, the nested style/list/flag fields, and handlers
+  const paths: string[][] = [
+    ...['tag', 'id', 'part', 'role', 'label', 'placeholder', 'type', 'checked', 'focused',
+      'invalid', 'required', 'disabled', 'contentEditable', 'description', 'text', 'on',
+      'list', 'viewportFixed', 'structural', 'style', 'ref', 'flags', 'image', 'href',
+      'value', 'interactive', 'editable', 'secret'].map((f) => [f]),
+    ['style', 'background'], ['style', 'borderColor'], ['style', 'color'],
+    ['list', 'path'], ['list', 'idPath'],
+    ['flags', '0'], ['flags', '0', 'kind'], ['flags', '0', 'label'], ['flags', '0', 'severity'],
+    ['on', 'click'],
+  ]
+  for (const path of paths) {
+    test(`${path.join('.')} of the wrong type throws nowhere`, () => {
+      for (const value of Object.values(wrong)) {
+        const record = base()
+        if (path[0] === 'list') record.list = { path: 'a.items' }
+        let at = record
+        for (const key of path.slice(0, -1)) at = at[key]
+        at[path[path.length - 1]] = value
+        const { svg } = schematic({ exposure: 'introspection', roots: {}, actions: [], wiring: [record, good] })
+        expect(svg).toContain('still here') // the rest of the map drew
+        expect(() => isInteractive(record)).not.toThrow()
+        expect(() => targetSizeFinding(record)).not.toThrow()
+      }
+    })
+  }
+
+  test('a style value that is not a string draws as if absent', () => {
+    const plain = { ...base(), style: undefined }
+    const map = (record: any) => schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [record] })
+    for (const value of Object.values(wrong)) {
+      expect(map({ ...base(), style: value })).toBe(map(plain))
+      expect(map({ ...base(), style: { background: value, borderColor: value, color: value } })).toBe(map(plain))
+    }
+    // positive control: a real style still draws its colours
+    expect(map(base())).toContain('fill="white"')
+  })
+})

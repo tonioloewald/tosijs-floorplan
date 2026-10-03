@@ -424,6 +424,18 @@ const esc = (s: string): string =>
 
 const TRANSPARENT = 'rgba(0, 0, 0, 0)'
 
+// a producer's computed colour, or the fallback: records are untrusted data,
+// and a non-string here (a number, an object, a missing key) used to reach
+// esc() and throw, so one malformed record denied the whole map (#2748).
+// Read once, so the value checked is the value drawn.
+const styleColor = (style: unknown, key: string, fallback: string): string => {
+  const value =
+    style != null && typeof style === 'object'
+      ? (style as Record<string, unknown>)[key]
+      : undefined
+  return typeof value === 'string' ? value : fallback
+}
+
 const FLAG_COLORS: Record<string, string> = {
   error: '#d32f2f',
   warn: '#e6a700',
@@ -671,14 +683,10 @@ export const schematic = (
     const editable = !structural && hasEditEvidence(w)
     const fill = structural
       ? 'none'
-      : w.style != null
-        ? w.style.background
-        : 'transparent'
-    const stroke =
-      !structural && w.style != null && w.style.borderColor !== TRANSPARENT
-        ? w.style.borderColor
-        : 'currentColor'
-    const color = w.style != null ? w.style.color : 'currentColor'
+      : styleColor(w.style, 'background', 'transparent')
+    const border = styleColor(w.style, 'borderColor', 'currentColor')
+    const stroke = !structural && border !== TRANSPARENT ? border : 'currentColor'
+    const color = styleColor(w.style, 'color', 'currentColor')
     // embedded media first: pixels the producer captured, drawn in place —
     // everything else (state geometry, captions, badges) reads over it
     const drawImage =

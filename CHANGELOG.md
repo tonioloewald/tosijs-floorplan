@@ -4,6 +4,20 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [Unreleased]
+
+### Fixed
+
+- **A malformed record no longer denies the whole map** (board #2748,
+  present in 0.5.0 and earlier). A record whose `style` (or its
+  `background`/`borderColor`/`color`) wasn't a string reached the escaper
+  and threw, so `schematic()` failed for every record. A style value that
+  isn't a string now draws as if absent. A fuzz test now covers every
+  record field × seven wrong types (number, object, array, null, boolean,
+  function, symbol) across `schematic`, `isInteractive` and
+  `targetSizeFinding`. `style` was the only field that threw, and the test
+  pins the rest. Valid input is byte-identical (`bun run stability`).
+
 ## [0.5.1] - 2026-10-02
 
 ### Security
