@@ -29,9 +29,13 @@ is sound, and says below what stays open.
 - **Bounds, `within`, `pad`, `fontSize` and style colours are read once**
   (board #2753), so a getter or Proxy can't pass their check and print
   markup. Shown on 0.5.1 code: `viewportFixed` bounds `x`/`y`, and
-  `within.y`/`within.height` through the legend footer.
-- **`esc()` refuses non-strings** (anything else escapes to `''`), so no
-  sink can be handed an object with its own `replaceAll`.
+  `within.y`/`within.height` through the legend footer. A record listed
+  twice in the wiring is drawn from one snapshot of its bounds. The
+  target-size rule judges the same snapshot, without rebuilding the
+  record, so class-backed and inherited records keep their verdict.
+- **`esc()` refuses non-strings** (anything else escapes to `''`). This is
+  defence in depth: no current call site passes a non-string, but no sink
+  can be handed an object with its own `replaceAll`.
 
 JSON-sourced records were never exposed to the read-once holes.
 
@@ -50,9 +54,13 @@ The README's attribute guarantee stays scoped to plain-data input.
 
 ### Measured
 
-- `dist/index.js`: 18,505 → 19,213 bytes (+708, +3.8%); gzip -9 5,579 →
-  5,798 (+219). Cost: the style guard, the read-once locals and their
+- `dist/index.js`: 18,505 → 19,666 bytes (+1,161, +6.3%); gzip -9 5,579 →
+  5,913 (+334). Cost: the style guard, the read-once snapshots and their
   comments.
+- A 2,000-record map renders in about 13 ms, down from 18 ms in 0.5.1
+  (release machine, built bundles). The container scan now reads each
+  box's snapshot from an array in a plain loop. The first read-once cut
+  had made it about 2× slower (0.5.2 review M2).
 
 **tosijs pins this package exactly (`0.5.0`)**, so it needs a pin bump to
 0.5.2 to get this release, 0.5.1's #2739 fix included.

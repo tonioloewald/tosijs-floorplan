@@ -103,6 +103,24 @@ FIXTURES.styled = {
   ],
 }
 
+// records that aren't plain object literals: inherited fields and a
+// class-backed record with a getter (0.5.2 round-3 M1: a spread dropped
+// inherited fields, and every other fixture is a literal)
+class ClassButton {
+  tag = 'button'
+  get on() {
+    return { click: 'app.go' }
+  }
+  constructor(public bounds: object) {}
+}
+FIXTURES.inherited = {
+  wiring: [
+    new ClassButton({ x: 10, y: 10, width: 20, height: 20 }),
+    Object.create({ tag: 'a', href: '/x', text: 'go' }, { bounds: { value: { x: 50, y: 10, width: 18, height: 18 }, enumerable: true } }),
+    Object.create({ tag: 'input', label: 'qty', value: '3 ⟷ app.qty' }, { bounds: { value: { x: 10, y: 50, width: 160, height: 30 }, enumerable: true } }),
+  ],
+}
+
 // options of the DECLARED type must draw byte-identically to the published
 // release — every option × every edge a number can take (plus null and
 // absent), and the pairs that meet in the same sink (within × pad: the
@@ -112,8 +130,9 @@ const EDGES: unknown[] = [0, -1, 1, 7.5, 44, 1e308, -1e308, NaN, Infinity, -Infi
 const OPTIONS = ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']
 const GRID_FIXTURES = ['form', 'sink', 'pinned', 'styled']
 
-// RECORD FIELDS: since 0.5.2 every record is snapshotted (readRecord), and
-// primitives must keep 0.5.1's semantics exactly, coercions included. Every
+// RECORD FIELDS: primitives must keep the published release's semantics
+// exactly, coercions included (0.5.2 changed how bounds, style and image
+// are read; #2829 plans a full record snapshot, and this grid is its oracle). Every
 // field × primitive values, on each record shape in the styled fixture,
 // compared on the whole result AND on the exported predicates (the verdict
 // surface, constraint 3 / #14). A case where the published release THREW is

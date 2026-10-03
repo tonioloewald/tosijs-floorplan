@@ -1363,3 +1363,42 @@ describe('0.5.2 narrow fixes', () => {
     }
   })
 })
+
+describe('0.5.2 round-3 fixes', () => {
+  class Button {
+    tag = 'button'
+    get on() { return { click: 'a.go' } }
+    constructor(public bounds: { x: number; y: number; width: number; height: number }) {}
+  }
+  const small = { x: 10, y: 10, width: 20, height: 20 }
+  const draw = (record: any) =>
+    schematic({ exposure: 'introspection', roots: {}, actions: [], wiring: [record] })
+
+  test('class-backed and inherited records keep their undersized verdict (M1)', () => {
+    const inherited = Object.create({ tag: 'button', on: { click: 'a.go' } }, {
+      bounds: { value: small, enumerable: true },
+    })
+    for (const record of [new Button(small), inherited]) {
+      const expected = targetSizeFinding(record, 24, { honorProducerFlags: true })
+      expect(expected).toBe('20×20 — below 24×24 (WCAG 2.5.8)') // positive control
+      const { svg, legend } = draw(record)
+      expect(legend[0]?.undersized).toBe(expected) // the map agrees with the predicate
+      expect(svg).toContain('data-flag="target-size"')
+    }
+  })
+
+  test('a record listed twice is drawn from one snapshot of its bounds (M4)', () => {
+    let reads = 0
+    const record: any = { tag: 'button', text: 'twice', on: { click: 'a.go' } }
+    Object.defineProperty(record, 'bounds', {
+      get: () => (reads++ === 0 ? { x: 10, y: 10, width: 60, height: 30 } : { x: -500, y: -500, width: 9999, height: 9999 }),
+      enumerable: true,
+    })
+    const svg = schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [record, record] })
+    // the geometry is drawn from the first read; the binding scan still
+    // reads every field (Object.entries), which is #2829's open class
+    expect(svg).toContain('twice') // positive control: drawn
+    expect(svg).not.toContain('9999')
+    expect(svg).not.toContain('-500')
+  })
+})

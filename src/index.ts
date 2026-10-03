@@ -348,10 +348,25 @@ export const TARGET_FLAG_KINDS: ReadonlySet<string> = new Set([
 export const targetSizeFinding = (
   w: SchematicRecord,
   targetSize = TARGET_SIZE_DEFAULT,
+  options: { honorProducerFlags?: boolean } = {}
+): string | null => {
+  const bounds = w.bounds
+  return bounds == null
+    ? null
+    : sizeFinding(w, bounds.width, bounds.height, targetSize, options)
+}
+
+// the rule over given dimensions: the renderer passes the geometry it
+// snapshotted (read once), never a rebuilt record — spreading one drops
+// inherited fields and lost class-backed records their verdict (0.5.2 M1)
+const sizeFinding = (
+  w: SchematicRecord,
+  width: number,
+  height: number,
+  targetSize = TARGET_SIZE_DEFAULT,
   { honorProducerFlags = false } = {}
 ): string | null => {
-  if (targetSize <= 0 || w.bounds == null || !isInteractive(w)) return null
-  const { width, height } = w.bounds
+  if (targetSize <= 0 || !isInteractive(w)) return null
   // hidden is not small (#9): a 0×0 (or unlaid-out) element is not a
   // target too small to hit — the guard lives here so callers passing raw
   // wiring don't each grow their own copy
@@ -527,13 +542,22 @@ export const schematic = (
       printable(within.height))
   // record geometry, snapshotted once into plain numbers: everything below
   // reads geometry.get(w), never w.bounds again
-  const geometry = new Map<SchematicRecord, SchematicBounds>()
-  const boxes = description.wiring.filter((w) => {
+  // a record object listed twice reuses its first snapshot, so a getter
+  // can't make one occurrence filtered and the other drawn (0.5.2 M4);
+  // null = read once, unusable
+  const geometry = new Map<SchematicRecord, SchematicBounds | null>()
+  const snapshotOf = (w: SchematicRecord): SchematicBounds | null => {
+    if (geometry.has(w)) return geometry.get(w)!
     const b = w.bounds
-    if (!withinOk || b == null) return false
-    const g = { x: b.x, y: b.y, width: b.width, height: b.height }
-    if (!finiteBounds(g)) return false
-    geometry.set(w, g)
+    const g = b == null ? null : { x: b.x, y: b.y, width: b.width, height: b.height }
+    const usable = g != null && finiteBounds(g) ? g : null
+    geometry.set(w, usable)
+    return usable
+  }
+  const boxes = description.wiring.filter((w) => {
+    if (!withinOk) return false
+    const g = snapshotOf(w)
+    if (g == null) return false
     return (
       g.width > 0 &&
       g.height > 0 &&
@@ -614,25 +638,27 @@ export const schematic = (
       'NOT established; a producer that cannot introspect handlers ' +
       'should assert `interactive`/`editable` per record (see README)'
     : undefined
+  // the container scan is O(N²): look each box's snapshot up once (0.5.2 M2)
+  const boxGeometry = boxes.map((b) => geometry.get(b)!)
   for (const w of drawOrder) {
     const index = description.wiring.indexOf(w)
     const pinOffsetX = w.viewportFixed === true ? minX + pad : 0
     const pinOffsetY = w.viewportFixed === true ? minY + pad : 0
-    const x = geometry.get(w)!.x + pinOffsetX
-    const y = geometry.get(w)!.y + pinOffsetY
-    const { width, height } = geometry.get(w)!
+    const own = geometry.get(w)!
+    const x = own.x + pinOffsetX
+    const y = own.y + pinOffsetY
+    const { width, height } = own
     // a box that CONTAINS other drawn boxes is a container: its textContent
     // is its children's text concatenated, so a text-derived caption would
     // overprint the children's own captions — the children speak for
     // themselves. Only an explicit label earns a container a caption.
-    const isContainer =
-      w.viewportFixed !== true &&
-      boxes.some(
-        (other) =>
-          other !== w &&
-          other.viewportFixed !== true &&
-          contains(geometry.get(w)!, geometry.get(other)!)
-      )
+    let isContainer = false
+    if (w.viewportFixed !== true)
+      for (let j = 0; j < boxes.length && !isContainer; j++)
+        isContainer =
+          boxes[j] !== w &&
+          boxes[j].viewportFixed !== true &&
+          contains(own, boxGeometry[j])
     // caption truth, per control kind:
     // - checkbox/radio: the state is GEOMETRY (✕ in the box, dot in the
     //   circle — drawn below, legible at any raster scale); the caption is
@@ -733,7 +759,7 @@ export const schematic = (
     // lives in the exported targetSizeFinding (issue #4: one
     // implementation, shared with tosijs's audit).
     // the snapshot, so the legend's size text is the geometry drawn
-    const undersized = targetSizeFinding({ ...w, bounds: geometry.get(w) }, targetSize, {
+    const undersized = sizeFinding(w, width, height, targetSize, {
       honorProducerFlags: true,
     })
     const emphasis = structural
