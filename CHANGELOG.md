@@ -4,7 +4,7 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
-## [Unreleased]
+## [0.5.2] - 2026-10-03
 
 A narrow hardening patch. The pre-tag review blocked two broader cuts of
 these fixes (reviews/0.5.2-patch-review*.md); this release ships only what
