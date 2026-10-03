@@ -34,8 +34,10 @@ is sound, and says below what stays open.
   target-size rule judges the same snapshot, without rebuilding the
   record, so class-backed and inherited records keep their verdict.
 - **`esc()` refuses non-strings** (anything else escapes to `''`). This is
-  defence in depth: no current call site passes a non-string, but no sink
-  can be handed an object with its own `replaceAll`.
+  defence in depth: for plain-data input no call site passes a
+  non-string. For in-process getters that change between reads (flag
+  `kind`/`label`, still open, #2829), it is the last line that keeps an
+  object with its own `replaceAll` out of the SVG.
 
 JSON-sourced records were never exposed to the read-once holes.
 
@@ -54,8 +56,8 @@ The README's attribute guarantee stays scoped to plain-data input.
 
 ### Measured
 
-- `dist/index.js`: 18,505 → 19,666 bytes (+1,161, +6.3%); gzip -9 5,579 →
-  5,913 (+334). Cost: the style guard, the read-once snapshots and their
+- `dist/index.js`: 18,505 → 19,706 bytes (+1,201, +6.5%); gzip -9 5,579 →
+  5,918 (+339). Cost: the style guard, the read-once snapshots and their
   comments.
 - A 2,000-record map renders in about 13 ms, down from 18 ms in 0.5.1
   (release machine, built bundles). The container scan now reads each

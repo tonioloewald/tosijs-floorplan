@@ -350,6 +350,8 @@ export const targetSizeFinding = (
   targetSize = TARGET_SIZE_DEFAULT,
   options: { honorProducerFlags?: boolean } = {}
 ): string | null => {
+  // a disabled audit never touches the record (0.5.1's order)
+  if (targetSize <= 0) return null
   const bounds = w.bounds
   return bounds == null
     ? null

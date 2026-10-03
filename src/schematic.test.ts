@@ -1401,4 +1401,11 @@ describe('0.5.2 round-3 fixes', () => {
     expect(svg).not.toContain('9999')
     expect(svg).not.toContain('-500')
   })
+
+  test('a disabled audit never touches the record (round 4)', () => {
+    const record: any = { tag: 'button', on: { click: 'a.go' } }
+    Object.defineProperty(record, 'bounds', { get: () => { throw new Error('read') }, enumerable: true })
+    expect(targetSizeFinding(record, 0)).toBeNull()
+    expect(targetSizeFinding({ tag: 'button', on: { click: 'a.go' }, bounds: small }, 24)).not.toBeNull() // positive control
+  })
 })
