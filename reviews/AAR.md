@@ -2,6 +2,36 @@
 
 Newest first. Facts, not analysis — the quarterly pass asks the whys.
 
+## 0.5.1 — 2026-10-03
+
+- Went well: the first release through the shared OIDC + staged-publish
+  workflow. Verify-only after approval confirmed the published bytes equal
+  the staged tarball, latest → 0.5.1, and the smoke test passed on the
+  registry's copy. Tier 0 caught two packaging defects before any review:
+  the test file shipped in every tarball since `files: ["src"]`, and a
+  Spotlight marker in local `dist/`.
+- Went well: the review turned a "comment fix + packaging" patch into a
+  real security fix (#2739, SVG attribute injection via non-number
+  geometry, present since 0.4.x). The 216-run option grid against
+  published 0.5.0 replaced hand-picked cases and caught every round-4
+  regression mechanically.
+- Didn't: five review rounds. Rounds 2-4 each found that the previous
+  fix had changed more behaviour than the injection needed (options too
+  strict, then coerced, then still rejecting ±Infinity), and round 3
+  turned the target-size audit fail-open for `targetSize: '44'`.
+- Surprised: tosijs pins this package exactly, so "bun update picks it
+  up" (CLAUDE.md constraint 2) was false. A security fix needs a pin-bump
+  ask.
+- Friction: auto mode refused every virta init/onboard/commit/push of the
+  hook files. The owner and the Practices session carried them, and the
+  approval wait expired once (60 min) before the 2FA approval came.
+- Cycle: none blocking. The fix→finding→fix loop at one boundary across
+  rounds 2-4 (no blockers) was stopped at round 4 by fixing the contract.
+- Follow-through open: tosijs pin bump + re-vendor (board), haltija #2756
+  sign-off, #2744/#2746/#2747/#2748/#2753/#2754, practices #2738/#2743.
+  byte-stability was touched this release, so #2584 (stale-license test)
+  is now due.
+
 ## 0.5.0 — 2026-09-13
 
 - Went well: all nine adoption issues (#7–#15, all from tosijs 1.11.0)
