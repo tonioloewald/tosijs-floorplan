@@ -15,9 +15,11 @@
  * preflight seam (asking for one is virta board #2588); until that
  * exists, the human/agent cutting the tag runs this by hand.
  */
-import { mkdtempSync, rmSync, statSync, existsSync } from 'node:fs'
+import { mkdtempSync, rmSync, statSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { gzipSync } from 'node:zlib'
+import { judge } from './stability-judge'
 
 // maps using ONLY constructs the published version supports
 const FIXTURES: Record<string, object> = {
@@ -78,103 +80,137 @@ const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string
   // self-expired on first post-publish run and the fixtures now pin bytes)
 }
 
-const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
-console.log(`working in ${dir}`)
-const pkg = (await import('../package.json')).default.name
-const packed = Bun.spawnSync(['npm', 'pack', `${pkg}@latest`, '--silent', '--pack-destination', dir])
-const tarball = [...new Bun.Glob('*.tgz').scanSync(dir)][0]
-if (packed.exitCode !== 0 || tarball == null) {
-  // a precondition failure is NOT a stability failure — say which it is
-  console.log(
-    `⏭️  could not fetch ${pkg}@latest (offline? registry down?) — ` +
-      'stability is UNVERIFIED, not passed; re-run online before tagging'
-  )
-  process.exit(1)
-}
-const untarred = Bun.spawnSync(['tar', 'xzf', join(dir, tarball), '-C', dir])
-if (untarred.exitCode !== 0) {
-  console.log(`⏭️  could not unpack ${tarball} — stability is UNVERIFIED, not passed`)
-  process.exit(1)
-}
-
-const published = await import(join(dir, 'package', 'dist', 'index.js'))
-const head = await import('../src/index.ts')
-
-// bundle-size delta: source lands verbatim inside tosijs's bundle
-// (constraint 2), so growth is a consumer-visible fact — name it in the
-// CHANGELOG when it moves
-const pubBytes = statSync(join(dir, 'package', 'dist', 'index.js')).size
-const localDist = new URL('../dist/index.js', import.meta.url).pathname
-if (existsSync(localDist)) {
-  const headBytes = statSync(localDist).size
-  const delta = headBytes - pubBytes
-  console.log(
-    `published dist/index.js: ${pubBytes} bytes vs HEAD: ${headBytes} ` +
-      `(${delta >= 0 ? '+' : ''}${delta}; run \`bun run build\` first for an honest HEAD number)`
-  )
+// pinned furniture (a viewportFixed nav) + a cramped flow box, so the
+// pinned-offset sink (minX + pad, #2739's own vector) and the legend
+// footer are both in every comparison (board #2754)
+FIXTURES.pinned = {
+  wiring: [
+    { tag: 'nav', text: 'menu', on: { click: 'app.menu' }, viewportFixed: true, bounds: { x: 0, y: 0, width: 120, height: 24 } },
+    { tag: 'button', text: 'tiny', on: { click: 'app.go' }, bounds: { x: 40, y: 60, width: 30, height: 9 } },
+    { tag: 'input', label: 'name', value: 'x ⟷ app.name', bounds: { x: 40, y: 90, width: 160, height: 28 } },
+  ],
 }
 
 // options of the DECLARED type must draw byte-identically to the published
 // release — every option × every edge a number can take (plus null and
-// absent), over form (layout) and sink (an 18×18 button, so the target-size
-// audit has something to say). A grid, not hand-picked cases: rounds 2-4 of
-// the 0.5.1 review each found a value the hand-picked list missed.
+// absent), and the pairs that meet in the same sink (within × pad: the
+// viewBox and the pinned offsets). A grid, not hand-picked cases: rounds 2-4
+// of the 0.5.1 review each found a value a hand-picked list missed.
 const EDGES: unknown[] = [0, -1, 1, 7.5, 44, 1e308, -1e308, NaN, Infinity, -Infinity, null, undefined]
 const OPTIONS = ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']
-const RUNS: [string, object, object | undefined][] = Object.entries(FIXTURES).map(
-  ([name, map]) => [name, map, undefined]
-)
-const grid: [string, object][] = []
-for (const option of OPTIONS)
-  for (const edge of EDGES) grid.push([`${option}: ${String(edge)}`, { [option]: edge }])
-for (const field of ['x', 'y', 'width', 'height'])
-  for (const edge of EDGES)
-    grid.push([`within.${field}: ${String(edge)}`, { within: { x: 0, y: 0, width: 300, height: 400, [field]: edge } }])
-for (const fixture of ['form', 'sink'])
-  for (const [name, options] of grid) RUNS.push([`${fixture} + ${name}`, FIXTURES[fixture], options])
+const GRID_FIXTURES = ['form', 'sink', 'pinned']
 
-let failed = false
-let gridPassed = 0
-for (const [name, map, options] of RUNS) {
-  const before = published.schematicSVG(map, options)
-  const after = head.schematicSVG(map, options)
-  const published_name = tarball.replace('.tgz', '')
-  const license = EXPECTED_DIVERGENCE[name]
-  const licenseLive = license != null && license.divergesFrom === published_name
-  if (license != null && !licenseLive) {
-    // version mismatch = the licensed change has published — the license
-    // is STALE whether or not bytes currently differ, and a stale license
-    // must never excuse drift (round-3 review: the identical-bytes-only
-    // check fired exactly when there was nothing to catch)
-    failed = true
-    console.log(
-      `❌ ${name}: license is STALE (diverges from ${license.divergesFrom}, ` +
-        `published is ${published_name}) — delete its EXPECTED_DIVERGENCE ` +
-        'entry so this fixture pins bytes again' +
-        (before === after ? ' (bytes currently identical)' : ' (bytes DIFFER — investigate before deleting)')
-    )
-  } else if (before === after) {
-    if (options === undefined) console.log(`✅ ${name}: byte-identical to published ${published_name}`)
-    else gridPassed++
-  } else if (licenseLive) {
-    console.log(`⚠️  ${name}: differs — licensed by "${license.reason}"`)
-  } else {
-    failed = true
-    let at = 0
-    while (before[at] === after[at]) at++
-    console.log(`❌ ${name}: UNLICENSED divergence at byte ${at}:`)
-    console.log(`   published: …${before.slice(Math.max(0, at - 40), at + 40)}…`)
-    console.log(`   HEAD:      …${after.slice(Math.max(0, at - 40), at + 40)}…`)
-  }
-}
-const gridRuns = RUNS.length - Object.keys(FIXTURES).length
-console.log(`${gridPassed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} byte-identical`)
-if (failed) {
-  console.log(
-    '\nOutput changed for an unchanged input. Either revert the drift, or ' +
-      'call the change out in CHANGELOG.md and license it in ' +
-      'EXPECTED_DIVERGENCE — never ship it silently (CLAUDE.md constraint 3).'
+const runs = (): [string, object, object | undefined][] => {
+  const runs: [string, object, object | undefined][] = Object.entries(FIXTURES).map(
+    ([name, map]) => [name, map, undefined]
   )
-  process.exit(1)
+  const grid: [string, object][] = []
+  for (const option of OPTIONS)
+    for (const edge of EDGES) grid.push([`${option}: ${String(edge)}`, { [option]: edge }])
+  for (const field of ['x', 'y', 'width', 'height'])
+    for (const edge of EDGES)
+      grid.push([`within.${field}: ${String(edge)}`, { within: { x: 0, y: 0, width: 300, height: 400, [field]: edge } }])
+  for (const edge of EDGES)
+    for (const padEdge of EDGES)
+      grid.push([
+        `within.x: ${String(edge)} × pad: ${String(padEdge)}`,
+        { within: { x: edge, y: 0, width: 300, height: 400 }, pad: padEdge },
+      ])
+  for (const fixture of GRID_FIXTURES)
+    for (const [name, options] of grid) runs.push([`${fixture} + ${name}`, FIXTURES[fixture], options])
+  return runs
 }
-rmSync(dir, { recursive: true, force: true })
+
+// everything schematic() returns is output (CLAUDE.md constraint 3: the
+// legend carries the verdicts and the undersized text), so compare it all
+const render = (lib: any, map: object, options: object | undefined): string =>
+  JSON.stringify(lib.schematic(map, options))
+
+const main = async (dir: string): Promise<number> => {
+  console.log(`working in ${dir}`)
+  const pkg = (await import('../package.json')).default.name
+  const packed = Bun.spawnSync(['npm', 'pack', `${pkg}@latest`, '--silent', '--pack-destination', dir])
+  const tarball = [...new Bun.Glob('*.tgz').scanSync(dir)][0]
+  if (packed.exitCode !== 0 || tarball == null) {
+    // a precondition failure is NOT a stability failure — say which it is
+    console.log(
+      `⏭️  could not fetch ${pkg}@latest (offline? registry down?) — ` +
+        'stability is UNVERIFIED, not passed; re-run online before tagging'
+    )
+    return 1
+  }
+  const untarred = Bun.spawnSync(['tar', 'xzf', join(dir, tarball), '-C', dir])
+  if (untarred.exitCode !== 0) {
+    console.log(`⏭️  could not unpack ${tarball} — stability is UNVERIFIED, not passed`)
+    return 1
+  }
+  const publishedName = tarball.replace('.tgz', '')
+  const publishedDist = join(dir, 'package', 'dist', 'index.js')
+  const published = await import(publishedDist)
+  const head = await import('../src/index.ts')
+
+  // bundle-size delta, built fresh from HEAD (never a stale local dist/):
+  // the source lands verbatim inside tosijs's bundle (constraint 2), so
+  // growth is a consumer-visible fact — name it in the CHANGELOG
+  const built = Bun.spawnSync(['bun', 'build', 'src/index.ts', '--outdir', join(dir, 'head'), '--format', 'esm'])
+  if (built.exitCode === 0) {
+    const size = (file: string) => {
+      const bytes = readFileSync(file)
+      return { raw: statSync(file).size, gz: gzipSync(bytes, { level: 9 }).length }
+    }
+    const was = size(publishedDist)
+    const now = size(join(dir, 'head', 'index.js'))
+    const delta = (a: number, b: number) => `${b - a >= 0 ? '+' : ''}${b - a}`
+    console.log(
+      `dist/index.js: ${publishedName} ${was.raw} B (${was.gz} gz) → HEAD ${now.raw} B ` +
+        `(${now.gz} gz): ${delta(was.raw, now.raw)} B, ${delta(was.gz, now.gz)} gz` +
+        (now.raw > was.raw ? ' — the bundle GREW: say so in the CHANGELOG (### Measured)' : '')
+    )
+  } else {
+    console.log('⏭️  could not build HEAD for the size delta — size UNMEASURED')
+  }
+
+  let failed = false
+  let gridRuns = 0
+  let gridPassed = 0
+  for (const [name, map, options] of runs()) {
+    const { verdict, message } = judge(
+      name,
+      render(published, map, options),
+      render(head, map, options),
+      EXPECTED_DIVERGENCE[name],
+      publishedName
+    )
+    if (verdict === 'stale' || verdict === 'drift') failed = true
+    if (options === undefined) console.log(message)
+    else {
+      gridRuns++
+      if (verdict === 'identical') gridPassed++
+      else console.log(message)
+    }
+  }
+  console.log(
+    `${gridPassed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical ` +
+      `(svg + legend + note) over ${GRID_FIXTURES.join(', ')}`
+  )
+  if (failed) {
+    console.log(
+      '\nOutput changed for an unchanged input. Either revert the drift, or ' +
+        'call the change out in CHANGELOG.md and license it in ' +
+        'EXPECTED_DIVERGENCE — never ship it silently (CLAUDE.md constraint 3).'
+    )
+    return 1
+  }
+  return 0
+}
+
+// the temp dir goes on EVERY exit path (board #2754: process.exit used to
+// skip the cleanup on each failure)
+const dir = mkdtempSync(join(tmpdir(), 'floorplan-stability-'))
+let code = 1
+try {
+  code = await main(dir)
+} finally {
+  rmSync(dir, { recursive: true, force: true })
+}
+process.exit(code)
