@@ -2,6 +2,30 @@
 
 Newest first. Facts, not analysis — the quarterly pass asks the whys.
 
+## 0.5.2 — 2026-10-03
+
+- Went well: fuzzing every record field × wrong types found #2748's real
+  extent (style was the only static thrower) in one pass. The stability
+  oracle grew to 8 fixtures + a 1,008-run option grid + a 1,418-run
+  record-field grid comparing svg, legend and both predicates against the
+  published release. Planted mutations and each review's repros were used
+  to prove every new guard discriminates.
+- Didn't: two BLOCKs. Round 1: both fixes were field-by-field (the 0.5.1
+  lesson, repeated). Round 2: the structural snapshot mixed read-once
+  copying with uniform type cleanup, so secret failed open for object
+  markers while 200/200 tests passed. The stop rule fired; the owner chose
+  a narrow release, and the redesign is #2829.
+- Surprised: the record-spread bug (class-backed records lost their
+  verdict) survived because every stability fixture was an object literal.
+  A non-literal fixture now guards it.
+- Friction: the 60-minute approval wait expired again (second release in
+  a row); verify_only after approval worked as designed.
+- Cycle: round 1 BLOCK → snapshot remediation → round 2 BLOCK (cycle flag)
+  → stop → narrow release; rounds 3-4 GO_WITH_FOLLOWUPS.
+- Follow-through open: #2829 (record-snapshot redesign, with plan), tosijs
+  pin bump to 0.5.2 (#2804), haltija #2756 sign-off, #2744/#2746/#2747
+  (0.6.0 output changes), practices #2743 (five review lessons).
+
 ## 0.5.1 — 2026-10-03
 
 - Went well: the first release through the shared OIDC + staged-publish
