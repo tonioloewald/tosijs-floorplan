@@ -252,10 +252,11 @@ it always has.
 its `<g>` closes, with the record, its resolved geometry, and an `emit`
 function. The corner slots already spoken for: **top-left** invalid flag,
 **top-right** index, **bottom-right** `↔` badge, **outline** focus/emphasis.
-`emit` takes raw SVG. The core guarantees that only escaped text and numbers
-reach its attributes (each value is read once, so getters and proxies can't
-change it between check and print), but that doesn't cover what a plugin
-emits: escape
+`emit` takes raw SVG. The core snapshots each record once at entry, so
+getters and proxies can't change a value between check and print, and it
+guarantees that only escaped text and numbers reach its attributes. That
+doesn't cover what a plugin emits. `decorate` receives the producer's
+original record, so escape
 anything you interpolate from the record. Claim empty real estate:
 
 ```js

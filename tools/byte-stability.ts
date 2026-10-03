@@ -91,6 +91,18 @@ FIXTURES.pinned = {
   ],
 }
 
+// styled records (the #2748 path) and an uncramped flagged record (the
+// inline flag bar), in shapes 0.5.1 already supported (board 0.5.2 F2)
+FIXTURES.styled = {
+  wiring: [
+    { tag: 'input', type: 'radio', checked: true, value: 'a ⟷ app.pick', style: { background: 'rgb(250, 250, 250)', borderColor: 'rgb(0, 0, 0)', color: 'rgb(20, 20, 20)' }, bounds: { x: 10, y: 10, width: 16, height: 16 } },
+    { tag: 'section', structural: true, style: { background: 'rgb(240, 240, 255)', borderColor: 'rgb(0, 0, 255)', color: 'black' }, bounds: { x: 0, y: 40, width: 300, height: 120 } },
+    { tag: 'button', text: 'save', on: { click: 'app.save' }, style: { background: 'white', borderColor: 'rgba(0, 0, 0, 0)', color: 'navy' }, bounds: { x: 20, y: 60, width: 90, height: 32 } },
+    { tag: 'a', href: '/help', text: 'help', image: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=', flags: [{ kind: 'contrast', label: '2.9:1', severity: 'warn' }], bounds: { x: 130, y: 60, width: 120, height: 40 } },
+    { tag: 'input', label: 'qty', placeholder: 'how many', value: '3 ⟷ app.qty', required: true, invalid: true, bounds: { x: 20, y: 110, width: 160, height: 30 } },
+  ],
+}
+
 // options of the DECLARED type must draw byte-identically to the published
 // release — every option × every edge a number can take (plus null and
 // absent), and the pairs that meet in the same sink (within × pad: the
@@ -98,7 +110,21 @@ FIXTURES.pinned = {
 // of the 0.5.1 review each found a value a hand-picked list missed.
 const EDGES: unknown[] = [0, -1, 1, 7.5, 44, 1e308, -1e308, NaN, Infinity, -Infinity, null, undefined]
 const OPTIONS = ['pad', 'minLabelHeight', 'maxCaption', 'fontSize', 'targetSize']
-const GRID_FIXTURES = ['form', 'sink', 'pinned']
+const GRID_FIXTURES = ['form', 'sink', 'pinned', 'styled']
+
+// RECORD FIELDS: since 0.5.2 every record is snapshotted (readRecord), and
+// primitives must keep 0.5.1's semantics exactly, coercions included. Every
+// field × primitive values, on each record shape in the styled fixture,
+// compared on the whole result AND on the exported predicates (the verdict
+// surface, constraint 3 / #14). A case where the published release THREW is
+// skipped (counted): throwing there is the bug 0.5.2 fixes.
+const PRIMITIVES: unknown[] = [5, 0, -1, true, false, '', 'x', 'a ⟷ app.b', null, undefined]
+const RECORD_FIELDS = [
+  'tag', 'id', 'part', 'role', 'label', 'placeholder', 'type', 'checked', 'focused',
+  'invalid', 'required', 'disabled', 'contentEditable', 'description', 'text', 'on',
+  'list', 'viewportFixed', 'structural', 'style', 'ref', 'flags', 'image', 'href',
+  'value', 'interactive', 'editable', 'secret', 'custom',
+]
 
 const runs = (): [string, object, object | undefined][] => {
   const runs: [string, object, object | undefined][] = Object.entries(FIXTURES).map(
@@ -125,6 +151,21 @@ const runs = (): [string, object, object | undefined][] => {
 // legend carries the verdicts and the undersized text), so compare it all
 const render = (lib: any, map: object, options: object | undefined): string =>
   JSON.stringify(lib.schematic(map, options))
+
+const verdicts = (lib: any, map: any): string => {
+  try {
+    return JSON.stringify([
+      lib.schematic(map),
+      map.wiring.map((r: any) => [
+        lib.isInteractive(r),
+        lib.targetSizeFinding(r),
+        lib.targetSizeFinding(r, 44, { honorProducerFlags: true }),
+      ]),
+    ])
+  } catch (e) {
+    return `THREW ${(e as Error).constructor.name}`
+  }
+}
 
 const main = async (dir: string): Promise<number> => {
   console.log(`working in ${dir}`)
@@ -192,6 +233,34 @@ const main = async (dir: string): Promise<number> => {
   console.log(
     `${gridPassed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical ` +
       `(svg + legend + note) over ${GRID_FIXTURES.join(', ')}`
+  )
+
+  let fieldRuns = 0
+  let fieldPassed = 0
+  let fieldSkipped = 0
+  const shapes = (FIXTURES.styled as any).wiring
+  for (let at = 0; at < shapes.length; at++)
+    for (const field of RECORD_FIELDS)
+      for (const value of PRIMITIVES) {
+        const wiring = shapes.map((r: any, i: number) => (i === at ? { ...r, [field]: value } : r))
+        const map = { ...FIXTURES.styled, wiring }
+        const before = verdicts(published, map)
+        if (before.startsWith('THREW')) {
+          fieldSkipped++
+          continue
+        }
+        fieldRuns++
+        const name = `styled[${at}].${field} = ${JSON.stringify(value) ?? 'undefined'}`
+        const { verdict, message } = judge(name, before, verdicts(head, map), undefined, publishedName)
+        if (verdict === 'identical') fieldPassed++
+        else {
+          failed = true
+          console.log(message)
+        }
+      }
+  console.log(
+    `${fieldPassed === fieldRuns ? '✅' : '❌'} record-field grid: ${fieldPassed}/${fieldRuns} identical ` +
+      `(result + isInteractive + targetSizeFinding); ${fieldSkipped} skipped where ${publishedName} threw`
   )
   if (failed) {
     console.log(

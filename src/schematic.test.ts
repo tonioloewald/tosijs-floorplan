@@ -1327,3 +1327,113 @@ describe('each guarded value is read once (board #2753)', () => {
     })
   }
 })
+
+describe('records are snapshotted once: no field can throw or inject, in any branch (0.5.2)', () => {
+  // the class, not the instances: every record shape the renderer
+  // branches on × every field × every hostile kind of value, including
+  // accessors that turn at ANY read (k = 1..10), so a check-then-reread
+  // anywhere fails here
+  const evilText = '1" onmouseover="alert(1)" a="'
+  const evilObject = { replaceAll: () => '"/><script>alert(1)</script><x a="', toString: () => evilText }
+  const nullProto = Object.create(null)
+  const hostile: [string, () => PropertyDescriptor][] = [
+    ['symbol', () => ({ value: Symbol('s'), enumerable: true })],
+    ['null-prototype object', () => ({ value: nullProto, enumerable: true })],
+    ['boxed string', () => ({ value: new String(evilText), enumerable: true })],
+    ['object with its own replaceAll', () => ({ value: evilObject, enumerable: true })],
+    ['function', () => ({ value: () => evilText, enumerable: true })],
+    ['throwing getter', () => ({ get: () => { throw new Error('boom') }, enumerable: true })],
+  ]
+  // a turncoat answers honestly for k-1 reads, then turns hostile
+  for (let k = 1; k <= 10; k++) {
+    hostile.push([`turncoat at read ${k} (string)`, () => {
+      let reads = 0
+      return { get: () => (++reads < k ? 'data:image/gif;base64,AAAA' : 'https://evil.example/x.png" onmouseover="a'), enumerable: true }
+    }])
+    hostile.push([`turncoat at read ${k} (object)`, () => {
+      let reads = 0
+      return { get: () => (++reads < k ? 'ok' : evilObject), enumerable: true }
+    }])
+  }
+  const shapes: Record<string, () => any> = {
+    input: () => ({ tag: 'input', label: 'qty', value: '3 ⟷ a.qty', placeholder: 'n', bounds: { x: 10, y: 10, width: 120, height: 30 } }),
+    secret: () => ({ tag: 'a', secret: true, href: '/m?t=X', label: 'l', bounds: { x: 10, y: 10, width: 120, height: 30 } }),
+    unlabeled: () => ({ tag: 'button', on: { click: 'a.go' }, bounds: { x: 10, y: 10, width: 120, height: 30 } }),
+    toggle: () => ({ tag: 'input', type: 'checkbox', checked: true, value: 'x ⟷ a.on', label: 'on', bounds: { x: 10, y: 10, width: 14, height: 14 } }),
+    container: () => ({ tag: 'div', label: 'group', on: { click: 'a.go' }, bounds: { x: 0, y: 0, width: 400, height: 300 } }),
+    flagged: () => ({ tag: 'button', text: 'b', on: { click: 'a.go' }, ref: '@1', flags: [{ kind: 'target', label: '2:1', severity: 'error' }], bounds: { x: 10, y: 10, width: 120, height: 30 } }),
+    image: () => ({ tag: 'img', image: 'data:image/gif;base64,AAAA', href: '/i', style: { background: 'white', borderColor: 'gray', color: 'black' }, bounds: { x: 10, y: 10, width: 120, height: 60 } }),
+  }
+  const fields = [
+    'tag', 'id', 'part', 'role', 'label', 'placeholder', 'type', 'checked', 'focused', 'invalid',
+    'required', 'disabled', 'contentEditable', 'description', 'text', 'on', 'list', 'bounds',
+    'viewportFixed', 'structural', 'style', 'ref', 'flags', 'image', 'href', 'value',
+    'interactive', 'editable', 'secret', 'custom',
+  ]
+  // nested fields, reached through their parent
+  const nested: [string, string][] = [
+    ['bounds', 'x'], ['bounds', 'y'], ['bounds', 'width'], ['bounds', 'height'],
+    ['style', 'background'], ['style', 'borderColor'], ['style', 'color'],
+    ['flags', 'kind'], ['flags', 'label'], ['flags', 'severity'],
+  ]
+  const sibling = { tag: 'button', text: 'still here', on: { click: 'a.go' }, bounds: { x: 500, y: 10, width: 90, height: 30 } }
+  // a hostile STRING is just text: it may appear, escaped, in a caption and
+  // verbatim in the legend (data). What must never happen: an unescaped
+  // quote opening an attribute, markup from an esc() bypass, an external
+  // image href, or a hostile OBJECT stringified anywhere (alert(1) only
+  // lives in evilObject/evilText's toString)
+  const check = (record: any) => {
+    const { svg, legend } = schematic({ exposure: 'introspection', roots: {}, actions: [], wiring: [record, sibling] })
+    expect(svg).toContain('still here')
+    expect(svg).not.toContain('onmouseover="')
+    expect(svg).not.toContain('<script')
+    expect(svg).not.toContain('href="https://evil')
+    expect(svg).not.toContain('alert(1)')
+    expect(JSON.stringify(legend)).not.toContain('alert(1)')
+    expect(() => isInteractive(record)).not.toThrow()
+    expect(() => targetSizeFinding(record, 44, { honorProducerFlags: true })).not.toThrow()
+  }
+
+  for (const [shapeName, shape] of Object.entries(shapes)) {
+    test(`${shapeName}: every field × every hostile value`, () => {
+      for (const field of fields)
+        for (const [, descriptor] of hostile) {
+          const record = shape()
+          Object.defineProperty(record, field, descriptor())
+          check(record)
+        }
+      for (const [parent, field] of nested)
+        for (const [, descriptor] of hostile) {
+          const record = shape()
+          const holder = parent === 'flags'
+            ? (record.flags = [{ kind: 'contrast', label: 'x', severity: 'warn' }])[0]
+            : (record[parent] ??= parent === 'style' ? { background: 'white', borderColor: 'gray', color: 'black' } : {})
+          Object.defineProperty(holder, field, descriptor())
+          check(record)
+        }
+    })
+  }
+
+  test('a hostile wiring or record list draws an empty map, never throws', () => {
+    const proxied = new Proxy([sibling], { get: () => { throw new Error('trap') } })
+    for (const wiring of [proxied, 'nope', 5, null, { length: 1, 0: sibling }]) {
+      expect(() => schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring } as any)).not.toThrow()
+    }
+    const trapRecord = new Proxy({}, { has: () => { throw new Error('trap') }, ownKeys: () => { throw new Error('trap') } })
+    const { svg } = schematic({ exposure: 'introspection', roots: {}, actions: [], wiring: [trapRecord, sibling] } as any)
+    expect(svg).toContain('still here') // the trap record is skipped, the map draws
+  })
+
+  test('an image is drawn only as the data: URI that was checked', () => {
+    for (let k = 1; k <= 10; k++) {
+      let reads = 0
+      const record: any = shapes.image()
+      Object.defineProperty(record, 'image', {
+        get: () => (++reads < k ? 'data:image/gif;base64,AAAA' : 'https://evil.example/x.png'),
+        enumerable: true,
+      })
+      const svg = schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [record] })
+      expect(svg).not.toContain('evil.example')
+    }
+  })
+})
