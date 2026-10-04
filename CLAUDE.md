@@ -109,6 +109,10 @@ those assertions deliberately.
 
 ## Ecosystem practices
 
+Not applicable: Prettier never touches markdown (#2556) — this repo has no
+Prettier (no config, no dependency); add the markdown requirePragma override
+if it ever gains one.
+
 **Tasks live on the virta board** (project `tosijs-floorplan`, onboarded
 2026-10-01). `TODO.md` and `UPSTREAM.md` are pointers only, so don't add
 list items to them. `virta brief` prints the board for this repo.
