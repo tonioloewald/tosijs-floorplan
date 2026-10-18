@@ -243,6 +243,25 @@ const shownValue = (v: unknown): string | undefined => {
 const neutralizeArrows = (s: string): string =>
   s.replaceAll(BOUND_TWO_WAY, '<->').replaceAll(BOUND_TO_DOM, '<-')
 
+/** every token the format reads as provenance, so a producer can scan for
+ * them without hard-coding the set (#3387) */
+export const PROVENANCE_TOKENS: readonly string[] = Object.freeze([
+  BOUND_TWO_WAY,
+  BOUND_TO_DOM,
+])
+
+/**
+ * The producer-side half of the provenance defense (#3387): rewrite every
+ * provenance token in untrusted text (⟷ → `<->`, ⟵ → `<-`), so page content
+ * can't forge a binding. A producer whose record text comes from content it
+ * doesn't control MUST pass that text through this at the source (README,
+ * "The record format"). It is the renderer's own neutralizer, so a new token
+ * reaches every producer that imports it. Anything but a string comes back
+ * as is.
+ */
+export const neutralizeProvenance = <T>(text: T): T =>
+  (typeof text === 'string' ? neutralizeArrows(text) : text) as T
+
 // is this string a live two-way binding? Only the arrow in STRUCTURAL
 // position (last) counts — a ⟷ buried inside the data must not confer an
 // affordance (a drawing that lies about what the page can do is worse than

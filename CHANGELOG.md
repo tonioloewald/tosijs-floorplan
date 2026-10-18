@@ -4,6 +4,21 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [Unreleased]
+
+Planned as 0.7.0, owner decision 2026-10-18: on `main`, release held.
+
+### Added
+
+- **`neutralizeProvenance(text)` and `PROVENANCE_TOKENS`** (#3387, asked for
+  by haltija's 1.13.0 release review). The producer-side half of the
+  provenance defense is now importable: a producer whose record text comes
+  from untrusted content (a DOM extractor) MUST neutralize ⟷ and ⟵ at the
+  source, and can now import the renderer's own rule instead of keeping a
+  copy, so a new token reaches every producer at once. A non-string comes
+  back as is. No output changes (`bun run stability`: every fixture and
+  both grids identical to 0.6.0).
+
 ## [0.6.0] - 2026-10-18
 
 Five deliberate changes, all output changes for some inputs, hence a minor

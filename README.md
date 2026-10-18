@@ -118,7 +118,9 @@ is data), and must not forward them into a caption-style text run without
 neutralizing first. **Producers whose record
 content derives from untrusted sources — any DOM extractor reading page
 content — MUST neutralize both tokens inside data at the source**, as
-tosijs ≥ 1.8.0 does. This is normative because of an honest residual: a
+tosijs ≥ 1.8.0 does. Import `neutralizeProvenance(text)` for this rather
+than copying the rule: it is the renderer's own neutralizer, so a new token
+reaches every producer at once (0.7.0, #3387, asked for by haltija). This is normative because of an honest residual: a
 forged arrow in *suffix* position on a bindable field (`"data ⟷ fake.path"`
 as the entire text) is structurally indistinguishable from a real binding —
 renderer-side defense ends where the format's own syntax begins. And the
@@ -241,6 +243,7 @@ kind starts with `nothing drawn:`. **Pair every raster with its legend.** |
 | `rasterizeSVG(svg, {scale})` | SVG → PNG Blob for vision encoders (browser canvas; under bun/node use `@resvg/resvg-js` — rasterize at 2× so labels OCR cleanly) |
 | `boundsOf(element)` | an element's page-coordinate bounds — the natural `within` argument |
 | `BOUND_TO_DOM`, `BOUND_TWO_WAY` | the provenance tokens |
+| `PROVENANCE_TOKENS`, `neutralizeProvenance(text)` | every provenance token, and the producer-side neutralizer for untrusted text (⟷ → `<->`, ⟵ → `<-`; a non-string comes back as is) |
 
 **Options**: `pad`, `minLabelHeight`, `maxCaption`, `fontSize`; `within`
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);

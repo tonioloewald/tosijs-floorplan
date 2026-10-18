@@ -34,6 +34,10 @@ Install: `npm add tosijs-floorplan`
 - `boundsOf(element)` — an element's page-coordinate bounds (the natural
   `within` argument). The only browser-touching exports are these two;
   everything else runs anywhere JSON does.
+- `neutralizeProvenance(text)` / `PROVENANCE_TOKENS` — the producer-side
+  provenance defense: a producer whose record text comes from untrusted
+  content (a DOM extractor) MUST pass it through this at the source.
+  Import it; don't copy the rule.
 - `BOUND_TO_DOM` (`⟵`, display binding) and `BOUND_TWO_WAY` (`⟷`,
   user-writable) — the provenance tokens found inside bound value strings
   (`"<shown> <arrow> <path>"`).

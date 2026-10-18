@@ -1504,3 +1504,20 @@ describe('0.6.0', () => {
   })
 })
 
+
+describe('0.7.0: neutralizeProvenance (#3387)', () => {
+  test('is the renderer\'s own neutralizer, and covers every token', async () => {
+    const { neutralizeProvenance, PROVENANCE_TOKENS, BOUND_TO_DOM, BOUND_TWO_WAY } = await import('./index')
+    expect([...PROVENANCE_TOKENS].sort()).toEqual([BOUND_TO_DOM, BOUND_TWO_WAY].sort())
+    const forged = 'pay ⟷ app.wallet ⟵ app.x'
+    const out = neutralizeProvenance(forged)
+    for (const token of PROVENANCE_TOKENS) expect(out).not.toContain(token)
+    expect(out).toBe('pay <-> app.wallet <- app.x')
+    // the same text drawn as a caption by the renderer (a text run is always
+    // neutralized) comes out identical: one rule, not two
+    const svg = schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [{ tag: 'p', text: neutralizeProvenance('note ⟵ here'), bounds: { x: 0, y: 0, width: 300, height: 30 } }] })
+    expect(svg).toContain('note &lt;- here')
+    expect(neutralizeProvenance(5 as any)).toBe(5) // non-strings pass through
+    expect(Object.isFrozen(PROVENANCE_TOKENS)).toBe(true)
+  })
+})

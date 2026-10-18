@@ -76,28 +76,20 @@ const FIXTURES: Record<string, object> = {
 // stale, and the fixture becomes a byte pin — an armed license can never
 // excuse the next drift.
 const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string }> = {
-  // the record-driven overflow: 0.5.2 printed an Infinity viewBox, 0.6.0
-  // an empty map with a note; the legend must stay identical (checked below)
-  far: { divergesFrom: 'tosijs-floorplan-0.5.2', reason: 'CHANGELOG 0.6.0: an overflowing extent says so (#2746)' },
+  // (empty since 0.6.0 published: 'far' and the 0.6.0 rule licenses
+  // self-expired on the first post-publish run)
 }
 
-// 0.6.0's deliberate option changes, licensed by RULE over the option grid
-// (a few hundred named runs; listing them would hide the rule). Version-
-// keyed like every license: once 0.6.0 publishes these read STALE and fail,
-// so delete this block then. Each value here drew nothing sensible in 0.5.x.
-const LICENSE_0_6_0 = {
-  divergesFrom: 'tosijs-floorplan-0.5.2',
-  reason:
-    'CHANGELOG 0.6.0: option ranges (#2747), an unusable within says so ' +
-    '(#2744), an overflowing extent says so (#2746)',
-}
-const CHANGED_IN_0_6_0: Record<string, unknown[]> = {
-  pad: [-1, 1e308, -1e308, Infinity, -Infinity, NaN],
-  fontSize: [0, -1, -1e308, Infinity, -Infinity, NaN],
-  maxCaption: [0, -1, -1e308, -Infinity, NaN],
-  minLabelHeight: [NaN],
-  within: [NaN, Infinity, -Infinity, null, undefined],
-}
+// A deliberate change to many grid runs is licensed by RULE (listing a few
+// hundred names would hide the rule): set RULE_LICENSE to the published
+// version it diverges from, the CHANGELOG entry, and the option values it
+// changes. Version-keyed like every license, so it goes STALE and fails
+// once that release publishes: then set it back to null. (0.6.0 used it for
+// #2744/#2746/#2747.)
+const RULE_LICENSE: {
+  license: { divergesFrom: string; reason: string }
+  changed: Record<string, unknown[]>
+} | null = null
 const licenseFor = (name: string) => {
   if (EXPECTED_DIVERGENCE[name] != null) return EXPECTED_DIVERGENCE[name]
   const at = name.indexOf(' + ')
@@ -108,9 +100,9 @@ const licenseFor = (name: string) => {
     .some((part) => {
       const [key, value] = part.split(': ')
       const option = key.startsWith('within.') ? 'within' : key
-      return (CHANGED_IN_0_6_0[option] ?? []).some((edge) => String(edge) === value)
+      return (RULE_LICENSE?.changed[option] ?? []).some((edge) => String(edge) === value)
     })
-  return changed ? LICENSE_0_6_0 : undefined
+  return changed ? RULE_LICENSE?.license : undefined
 }
 
 // pinned furniture (a viewportFixed nav) + a cramped flow box, so the
@@ -317,7 +309,7 @@ const main = async (dir: string): Promise<number> => {
   }
   console.log(
     `${gridPassed + gridLicensed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical` +
-      (gridLicensed > 0 ? `, ${gridLicensed} licensed differences (${LICENSE_0_6_0.reason})` : '') +
+      (gridLicensed > 0 ? `, ${gridLicensed} licensed differences (${RULE_LICENSE?.license.reason})` : '') +
       ` — svg + legend + note over ${GRID_FIXTURES.join(', ')}`
   )
 
