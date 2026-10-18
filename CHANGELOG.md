@@ -4,7 +4,7 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
-## [Unreleased]
+## [0.6.0] - 2026-10-18
 
 Five deliberate changes, all output changes for some inputs, hence a minor
 release (CLAUDE.md constraint 3). Two come from haltija's adoption of 0.5.2,
