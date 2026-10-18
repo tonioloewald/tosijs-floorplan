@@ -1409,3 +1409,71 @@ describe('0.5.2 round-3 fixes', () => {
     expect(targetSizeFinding({ tag: 'button', on: { click: 'a.go' }, bounds: small }, 24)).not.toBeNull() // positive control
   })
 })
+
+describe('0.6.0', () => {
+  const map = (wiring: any[], extra: object = {}): SchematicDescription =>
+    ({ exposure: 'introspection', roots: {}, actions: [], wiring, ...extra }) as any
+  const button = (x = 10) => ({ tag: 'button', text: 'go', on: { click: 'a.go' }, ref: '@42', bounds: { x, y: 10, width: 80, height: 30 } })
+
+  test('refStyle pill: white bold on dark, in the stamp footprint (#3376)', () => {
+    const pill = schematicSVG(map([button()]), { refStyle: 'pill' })
+    expect(pill).toContain('fill="#0f172a"')
+    expect(pill).toContain('font-weight="bold" fill="white">@42</text>')
+    const stamp = schematicSVG(map([button()]))
+    expect(stamp).toContain('fill="black" opacity="0.8">@42</text>') // the default is unchanged
+    expect(stamp).not.toContain('#0f172a')
+    expect(schematicSVG(map([button()]), { refStyle: 'loud' as any })).toBe(stamp) // unknown = default
+  })
+
+  test('introspected: a producer that checked every element gets no "couldn\'t tell" note (#2586)', () => {
+    const inert = [{ tag: 'p', text: 'just text', bounds: { x: 10, y: 10, width: 200, height: 30 } }]
+    expect(schematic(map(inert)).note).toContain('NOT established') // positive control
+    const checked = schematic(map(inert, { introspected: true }))
+    expect(checked.note).toBeUndefined()
+    expect(checked.svg).not.toContain('NOT established')
+    expect(schematic(map(inert, { introspected: 'yes' })).note).toContain('NOT established') // only true is signal
+  })
+
+  test('an unusable within says so, and is not an empty region (#2744)', () => {
+    const empty = schematic(map([button()]), { within: { x: 5000, y: 5000, width: 10, height: 10 } })
+    expect(empty.note).toBeUndefined() // a real, empty region: no note
+    for (const bad of [NaN, Infinity, null, undefined, '0']) {
+      const r = schematic(map([button()]), { within: { x: 0, y: 0, width: 300, height: bad } as any })
+      expect(r.note).toContain('not a usable region')
+      expect(r.svg).toContain('<desc>nothing drawn')
+      expect(r.svg).not.toContain('@42')
+    }
+  })
+
+  test('an extent that overflows says so instead of printing Infinity (#2746)', () => {
+    for (const [wiring, options] of [
+      [[button()], { pad: 1e308 }],
+      [[{ ...button(), bounds: { x: 1.7e308, y: 10, width: 1.7e308, height: 30 } }], {}],
+      // two finite, visible boxes whose span exceeds Number.MAX_VALUE
+      [[{ ...button(), bounds: { x: 1.7e308, y: 10, width: 80, height: 30 } }, { ...button(), bounds: { x: -1e308, y: 10, width: 1.5e308, height: 30 } }], {}],
+    ] as [any[], object][]) {
+      const r = schematic(map(wiring), options)
+      expect(r.note).toContain('overflows a finite number')
+      expect(r.svg).not.toMatch(/Infinity|NaN/)
+    }
+    expect(schematic(map([button()])).note).toBeUndefined() // positive control
+  })
+
+  test('option ranges: a meaningless number means the default; meaningful extremes keep their meaning (#2747)', () => {
+    const long = { ...button(), text: 'a caption well past thirty-six characters long', bounds: { x: 10, y: 10, width: 600, height: 30 } }
+    const d = map([long, button(700)])
+    const base = schematicSVG(d)
+    for (const [option, values] of Object.entries({
+      pad: [-1, NaN, Infinity, -Infinity],
+      fontSize: [0, -1, NaN, Infinity, -Infinity],
+      maxCaption: [0, -1, NaN, -Infinity],
+      minLabelHeight: [NaN],
+    }))
+      for (const v of values) expect(schematicSVG(d, { [option]: v })).toBe(base)
+    // the extremes that mean something stay: never truncate, legend only
+    expect(schematicSVG(d, { maxCaption: Infinity })).toContain('thirty-six characters long')
+    expect(schematicSVG(d, { maxCaption: 36 })).not.toContain('thirty-six characters long')
+    expect(schematic(d, { minLabelHeight: Infinity }).legend.length).toBe(2)
+    expect(schematic(d).legend.length).toBe(1) // only the truncated caption
+  })
+})

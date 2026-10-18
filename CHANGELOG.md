@@ -4,6 +4,65 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
+## [Unreleased]
+
+Five deliberate changes, all output changes for some inputs, hence a minor
+release (CLAUDE.md constraint 3). Two come from haltija's adoption of 0.5.2,
+the first real third-party plugin and producer feedback; three are 0.5.1
+review follow-ups. For every input not listed below, output is unchanged
+(`bun run stability`: each difference from 0.5.2 is licensed by name, by the
+rule below, and the record-field grid is identical).
+
+### Added
+
+- **`introspected: true` on the description** (#2586, proposed by haltija).
+  The producer checked every record for affordances, so a record without
+  evidence is known inert. It suppresses the "couldn't tell" `note`: a page
+  with no controls is a finding, not a blind spot. Only `true` is signal.
+  This is an additive optional field in the multi-producer format
+  (constraint 4).
+- **`refStyle: 'pill'`** (#3376, from haltija). The ref/index stamp is drawn
+  as white bold monospace on a dark (`#0f172a`) pill in the stamp's
+  footprint, for refs an agent retypes (`hj click @ref`), where a misread is
+  an error. haltija drew this over the stamp as a `decorate` plugin. The
+  default (`'stamp'`) is unchanged, and an unknown value means the default.
+
+### Changed — output for inputs that never drew sensibly
+
+- **An unusable `within` says so** (#2744). A region with any field that
+  isn't a finite number (NaN, Infinity, `null`, missing, a string) draws an
+  empty map with a `note` and `<desc>` ("not a usable region"), so it can't
+  pass for an empty region. 0.5.x drew a bare empty map, or (for `null` or
+  missing fields) coerced them to 0 or NaN.
+- **An overflowing extent says so** (#2746). When the map's extent
+  overflows a finite number (a pad of 1e308; boxes whose span passes
+  `Number.MAX_VALUE`), the result is an empty map with a `note`, rather
+  than a viewBox of `Infinity`/`NaN` that draws nothing anywhere.
+- **Option ranges** (#2747). `pad` must be a finite number ≥ 0 and
+  `fontSize` a finite number > 0, or they are the default (8 and 11): a
+  negative pad clipped the drawing, a zero or negative font hid every
+  caption, and a non-finite one broke the viewBox. `maxCaption` below 1, or
+  NaN, is the default (36). `minLabelHeight` NaN is the default (14). The
+  meaningful extremes keep their meaning: `maxCaption: Infinity` never
+  truncates, `minLabelHeight: Infinity` puts every caption in the legend,
+  and `targetSize` is unchanged. `null` keeps 0.5.x's meaning (0) for `pad`.
+
+### Verdict changes — same input, different answer
+
+- **A `within` with a `null` or missing field** drew in 0.5.x (coerced to
+  0). It now draws nothing, so the records under it lose their legend
+  entries, `undersized` included. `isInteractive` and `targetSizeFinding`
+  themselves are unchanged.
+- The option-range changes move records across the legend's cramped
+  threshold (it depends on `fontSize`, `minLabelHeight` and `maxCaption`)
+  only for values listed above. No `undersized` answer changes for any
+  option value.
+
+### Measured
+
+- `dist/index.js`: 19,706 → 20,968 bytes (+1262); gzip -9 5,918 → 6,235
+  (+317). Cost: the pill stamp, the two notes and the range rules.
+
 ## [0.5.2] - 2026-10-03
 
 A narrow hardening patch. The pre-tag review blocked two broader cuts of

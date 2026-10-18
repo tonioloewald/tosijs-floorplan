@@ -151,8 +151,12 @@ any still means *unknown*, not *inert* (the note only marks the total-blindness
 case; non-introspecting producers should assert per actable record, not rely
 on the note); and **only `interactive: true` / `editable: true` are signal** —
 `false` is indistinguishable from absent and cannot veto evidence the record
-itself carries (`on`, `href`, a binding). "Introspected and found nothing"
-currently has no encoding; propose one via issue before relying on it.
+itself carries (`on`, `href`, a binding). **"Introspected and found
+nothing"** is the description-level `introspected: true` (0.6.0, proposed by
+haltija, #2586): the producer checked every record for affordances, so a
+record without evidence is known inert. It suppresses the note: a page with
+no controls is then a finding, not a blind spot. Only `true` is signal.
+Assert it only if you really did check every element.
 
 **The picture is not the whole payload.** The renderer is *allowed to omit*:
 captions and badges below legibility thresholds move to the legend, keyed by
@@ -237,14 +241,24 @@ geometry genuinely runs out.
 
 **Options**: `pad`, `minLabelHeight`, `maxCaption`, `fontSize`; `within`
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);
-`index: true` (stamp record indexes); `targetSize` (the undersized-audit
+`index: true` (stamp record indexes); `refStyle: 'pill'` (draw the ref
+stamp as white bold text on a dark pill, for refs an agent retypes; the
+default `'stamp'` is recessive grey); `targetSize` (the undersized-audit
 floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
-the footer strip); `decorate` (below). A `pad` or `fontSize` that isn't a
-number primitive (a string, boolean, array or object, `Number` wrappers
-included) is its default, and a `within` with such a field renders an
-empty map, rather than the whole one. These are
-the options that print into the SVG. Every other option value behaves as
-it always has.
+the footer strip); `decorate` (below).
+
+Option ranges (0.6.0): a value that can't draw anything sensible means the
+option's default. `pad` must be a finite number ≥ 0 and `fontSize` a finite
+number > 0 (anything else, including a non-number, is the default).
+`maxCaption` below 1, or NaN, is the default, and `Infinity` means never
+truncate. `minLabelHeight` NaN is the default, and `Infinity` sends every
+caption to the legend. `targetSize` is unchanged.
+
+**When nothing is drawn, the result says why** unless the region really is
+empty: a `within` that isn't four finite numbers, or a map whose extent
+overflows a finite number (a coordinate, size or pad near
+`Number.MAX_VALUE`), returns an empty map with a `note` (also in the svg's
+`<desc>`).
 
 ## Plugins (EXPERIMENTAL)
 
@@ -252,6 +266,8 @@ it always has.
 its `<g>` closes, with the record, its resolved geometry, and an `emit`
 function. The corner slots already spoken for: **top-left** invalid flag,
 **top-right** index, **bottom-right** `↔` badge, **outline** focus/emphasis.
+A plugin that needs a slot drawn differently, not new space, is asking for a
+style option: `refStyle` began as haltija's plugin that drew over the stamp.
 `emit` takes raw SVG. For plain-data records and options (JSON-shaped, no
 getters or proxies), the core guarantees that only escaped text and numbers
 reach its attributes, but that doesn't cover what a plugin emits: escape

@@ -80,6 +80,38 @@ const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string
   // self-expired on first post-publish run and the fixtures now pin bytes)
 }
 
+// 0.6.0's deliberate option changes, licensed by RULE over the option grid
+// (a few hundred named runs; listing them would hide the rule). Version-
+// keyed like every license: once 0.6.0 publishes these read STALE and fail,
+// so delete this block then. Each value here drew nothing sensible in 0.5.x.
+const LICENSE_0_6_0 = {
+  divergesFrom: 'tosijs-floorplan-0.5.2',
+  reason:
+    'CHANGELOG 0.6.0: option ranges (#2747), an unusable within says so ' +
+    '(#2744), an overflowing extent says so (#2746)',
+}
+const CHANGED_IN_0_6_0: Record<string, unknown[]> = {
+  pad: [-1, 1e308, -1e308, Infinity, -Infinity, NaN],
+  fontSize: [0, -1, -1e308, Infinity, -Infinity, NaN],
+  maxCaption: [0, -1, -1e308, -Infinity, NaN],
+  minLabelHeight: [NaN],
+  within: [NaN, Infinity, -Infinity, null, undefined],
+}
+const licenseFor = (name: string) => {
+  if (EXPECTED_DIVERGENCE[name] != null) return EXPECTED_DIVERGENCE[name]
+  const at = name.indexOf(' + ')
+  if (at < 0) return undefined
+  const changed = name
+    .slice(at + 3)
+    .split(' × ')
+    .some((part) => {
+      const [key, value] = part.split(': ')
+      const option = key.startsWith('within.') ? 'within' : key
+      return (CHANGED_IN_0_6_0[option] ?? []).some((edge) => String(edge) === value)
+    })
+  return changed ? LICENSE_0_6_0 : undefined
+}
+
 // pinned furniture (a viewportFixed nav) + a cramped flow box, so the
 // pinned-offset sink (minX + pad, #2739's own vector) and the legend
 // footer are both in every comparison (board #2754)
@@ -233,12 +265,13 @@ const main = async (dir: string): Promise<number> => {
   let failed = false
   let gridRuns = 0
   let gridPassed = 0
+  let gridLicensed = 0
   for (const [name, map, options] of runs()) {
     const { verdict, message } = judge(
       name,
       render(published, map, options),
       render(head, map, options),
-      EXPECTED_DIVERGENCE[name],
+      licenseFor(name),
       publishedName
     )
     if (verdict === 'stale' || verdict === 'drift') failed = true
@@ -246,12 +279,14 @@ const main = async (dir: string): Promise<number> => {
     else {
       gridRuns++
       if (verdict === 'identical') gridPassed++
+      else if (verdict === 'licensed') gridLicensed++
       else console.log(message)
     }
   }
   console.log(
-    `${gridPassed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical ` +
-      `(svg + legend + note) over ${GRID_FIXTURES.join(', ')}`
+    `${gridPassed + gridLicensed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical` +
+      (gridLicensed > 0 ? `, ${gridLicensed} licensed differences (${LICENSE_0_6_0.reason})` : '') +
+      ` — svg + legend + note over ${GRID_FIXTURES.join(', ')}`
   )
 
   let fieldRuns = 0
