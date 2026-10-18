@@ -128,7 +128,7 @@ export interface SchematicOptions {
    * below 1, or NaN, means the default) */
   maxCaption?: number
   /** caption font size, px (default 11; zero, negative or non-finite means
-   * the default) */
+   * the default; null keeps its 0.5.x meaning) */
   fontSize?: number
   /**
    * Scope the map SPATIALLY: only records whose bounds intersect this
@@ -148,6 +148,7 @@ export interface SchematicOptions {
    * monospace over a white backdrop, recessive. `'pill'`: white bold text
    * on a dark pill, for producers whose ref is a handle an agent retypes
    * (haltija's `hj click @ref`), where a misread is an error (#3376).
+   * Any other value means the default.
    */
   refStyle?: 'stamp' | 'pill'
   /**
@@ -640,33 +641,39 @@ export const schematic = (
   // scoped: the viewBox IS the region; unscoped: fit the FLOW boxes (pinned
   // furniture must not stretch the map)
   const fitBoxes = flow.length > 0 ? flow : boxes
-  const minX =
+  const minXRaw =
     within != null
       ? within.x - pad
       : Math.min(...fitBoxes.map((w) => geometry.get(w)!.x)) - pad
-  const minY =
+  const minYRaw =
     within != null
       ? within.y - pad
       : Math.min(...fitBoxes.map((w) => geometry.get(w)!.y)) - pad
-  const maxX =
+  const maxXRaw =
     within != null
       ? within.x + within.width + pad
       : Math.max(...fitBoxes.map((w) => geometry.get(w)!.x + geometry.get(w)!.width)) + pad
-  const maxY =
+  const maxYRaw =
     within != null
       ? within.y + within.height + pad
       : Math.max(...fitBoxes.map((w) => geometry.get(w)!.y + geometry.get(w)!.height)) + pad
   // finite inputs can still sum past Number.MAX_VALUE (a pad of 1e308, a
   // box at 1.7e308): a viewBox of Infinity/NaN draws nothing anywhere, so
-  // say so instead of emitting it (#2746)
-  if (
-    ![minX, minY, maxX, maxY, maxX - minX, maxY - minY].every(Number.isFinite)
-  ) {
-    return emptyMap(
-      'nothing drawn: the map\'s extent overflows a finite number (a ' +
-        'coordinate, size or pad near Number.MAX_VALUE)'
-    )
-  }
+  // the map says so instead of emitting it (#2746). The LEGEND doesn't
+  // depend on the extents, so it is still built: one far-off record must
+  // not erase every other record's verdicts (0.6.0 review). The drawing is
+  // laid out against a zero origin and discarded.
+  const overflow = ![
+    minXRaw,
+    minYRaw,
+    maxXRaw,
+    maxYRaw,
+    maxXRaw - minXRaw,
+    maxYRaw - minYRaw,
+  ].every(Number.isFinite)
+  const [minX, minY, maxX, maxY] = overflow
+    ? [0, 0, 0, 0]
+    : [minXRaw, minYRaw, maxXRaw, maxYRaw]
 
   // explicit width/height (not just viewBox): gives the svg an intrinsic
   // size as a document/img, and Firefox refuses to draw an svg image onto a
@@ -1084,7 +1091,7 @@ export const schematic = (
         )
       }
     }
-    if (decorate != null) {
+    if (decorate != null && !overflow) {
       decorate({
         record: w,
         index,
@@ -1097,6 +1104,13 @@ export const schematic = (
       })
     }
     parts.push('</g>')
+  }
+  if (overflow) {
+    return emptyMap(
+      'nothing drawn: the map\'s extent overflows a finite number (a ' +
+        'coordinate, size or pad near Number.MAX_VALUE); the legend still ' +
+        'carries every record\'s facts'
+    )
   }
   // the image confesses what it couldn't carry: a machine-readable <desc>
   // plus a visible footer strip — the raster's pointer to its legend JSON

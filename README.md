@@ -147,8 +147,8 @@ because "nothing here is actionable" and "the producer couldn't tell" are
 different statements, and a consumer must never mistake the second for the
 first. Two caveats pin the semantics: **partial evidence does not establish
 the rest** — on a map where some records carry evidence, a record without
-any still means *unknown*, not *inert* (the note only marks the total-blindness
-case; non-introspecting producers should assert per actable record, not rely
+any still means *unknown*, not *inert* (this note only marks the
+total-blindness case; non-introspecting producers should assert per actable record, not rely
 on the note); and **only `interactive: true` / `editable: true` are signal** —
 `false` is indistinguishable from absent and cannot veto evidence the record
 itself carries (`on`, `href`, a binding). **"Introspected and found
@@ -183,7 +183,7 @@ checkbox sizes.
 | double outline | keyboard focus — where the user is |
 | faint dotted | structure — including list *containers* (their items are the affordances) |
 | number, top-right, on a white backdrop | the record's index (`index: true`) — the raster form of `data-record`: read it off the image, look up `wiring[n]` |
-| a `ref` (e.g. `@42`), top-right | the producer's **durable, actionable handle** — takes the index slot when present, survives re-renders, rides the group as `data-ref` |
+| a `ref` (e.g. `@42`), top-right | the producer's **durable, actionable handle** — takes the index slot when present, survives re-renders, rides the group as `data-ref`. With `refStyle: 'pill'`, white bold on a dark pill: for a ref an agent retypes |
 | colored bars, left edge | computed **verdicts** (`flags`): WCAG contrast failures and friends — error red, warn amber, info gray, first flag's label shown |
 | pixels inside a box | embedded media (`image`: a data URL) — the producer's snapshot of inline `<svg>`/`<canvas>`, drawn in place |
 | a bare box wearing only a stamped number | too small to label legibly — its caption, badges and flags live in the **legend**, matched by that number |
@@ -230,7 +230,10 @@ geometry genuinely runs out.
 
 | export | what |
 | --- | --- |
-| `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend, note? }`: the drawing, the metadata it could not legibly carry (cramped/truncated/undersized records, keyed by index/ref), and — when no record carries affordance evidence — the note saying so. **Pair every raster with its legend.** |
+| `schematic(description, options?)` | the renderer's primary form — returns `{ svg, legend, note? }`: the drawing, the metadata it could not legibly carry (cramped/truncated/undersized records, keyed by index/ref), and `note` when the drawing can't be trusted to say something: no record
+carries affordance evidence (and the producer didn't assert `introspected`),
+or nothing was drawn for a reason other than an empty region. The second
+kind starts with `nothing drawn:`. **Pair every raster with its legend.** |
 | `schematicSVG(description, options?)` | `schematic().svg` — the string-only form; each `<g>` carries `data-record="<i>"` linking back to `description.wiring[i]` (the image as index) |
 | `isInteractive(record)` | "can I act here?" — the single implementation (handlers, `href`, `contentEditable`, a structural two-way binding, or the producer's assertion; ground never). Exported so audits consume it instead of keeping a drifting copy |
 | `targetSizeFinding(record, targetSize?, {honorProducerFlags?})` | the WCAG 2.5.8 rule with the settled exemptions (toggles, text-sized links, zero-size; producer-flag supersession only when honoured — the renderer's setting, not an audit's) — the measured legend fact, or `null` |
@@ -243,13 +246,15 @@ geometry genuinely runs out.
 (a page-coordinate rect — spatial scoping: the viewBox *is* the region);
 `index: true` (stamp record indexes); `refStyle: 'pill'` (draw the ref
 stamp as white bold text on a dark pill, for refs an agent retypes; the
-default `'stamp'` is recessive grey); `targetSize` (the undersized-audit
+default `'stamp'` is recessive grey, and an unknown value means the
+default); `targetSize` (the undersized-audit
 floor: 24 default, 44/48 for touch, 0 off); `legendNote: false` (suppress
 the footer strip); `decorate` (below).
 
 Option ranges (0.6.0): a value that can't draw anything sensible means the
 option's default. `pad` must be a finite number ≥ 0 and `fontSize` a finite
-number > 0 (anything else, including a non-number, is the default).
+number > 0 (anything else, including a non-number, is the default;
+`null` keeps its 0.5.x meaning for both).
 `maxCaption` below 1, or NaN, is the default, and `Infinity` means never
 truncate. `minLabelHeight` NaN is the default, and `Infinity` sends every
 caption to the legend. `targetSize` is unchanged.
@@ -258,7 +263,7 @@ caption to the legend. `targetSize` is unchanged.
 empty: a `within` that isn't four finite numbers, or a map whose extent
 overflows a finite number (a coordinate, size or pad near
 `Number.MAX_VALUE`), returns an empty map with a `note` (also in the svg's
-`<desc>`).
+`<desc>`). On overflow the legend is still complete.
 
 ## Plugins (EXPERIMENTAL)
 

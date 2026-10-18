@@ -22,8 +22,9 @@ rule below, and the record-field grid is identical).
   This is an additive optional field in the multi-producer format
   (constraint 4).
 - **`refStyle: 'pill'`** (#3376, from haltija). The ref/index stamp is drawn
-  as white bold monospace on a dark (`#0f172a`) pill in the stamp's
-  footprint, for refs an agent retypes (`hj click @ref`), where a misread is
+  as white bold monospace on a dark (`#0f172a`) pill, haltija's design (one
+  pixel wider and taller than the stamp's backdrop), for refs an agent
+  retypes (`hj click @ref`), where a misread is
   an error. haltija drew this over the stamp as a `decorate` plugin. The
   default (`'stamp'`) is unchanged, and an unknown value means the default.
 
@@ -32,12 +33,17 @@ rule below, and the record-field grid is identical).
 - **An unusable `within` says so** (#2744). A region with any field that
   isn't a finite number (NaN, Infinity, `null`, missing, a string) draws an
   empty map with a `note` and `<desc>` ("not a usable region"), so it can't
-  pass for an empty region. 0.5.x drew a bare empty map, or (for `null` or
-  missing fields) coerced them to 0 or NaN.
+  pass for an empty region. In 0.5.x, a `null` x or y coerced to 0 and an
+  `Infinity` width or height still drew (both are now verdict changes,
+  below); NaN, `-Infinity`, missing and `null` width/height already drew
+  nothing and now say why.
 - **An overflowing extent says so** (#2746). When the map's extent
   overflows a finite number (a pad of 1e308; boxes whose span passes
-  `Number.MAX_VALUE`), the result is an empty map with a `note`, rather
-  than a viewBox of `Infinity`/`NaN` that draws nothing anywhere.
+  `Number.MAX_VALUE`), the svg is an empty map with a `note`, rather than
+  a viewBox of `Infinity`/`NaN` that drew nothing anywhere. **The legend is
+  still built** and is identical to 0.5.2's, so one far-off record can't
+  erase every other record's facts (the pre-tag review caught a first cut
+  that dropped it).
 - **Option ranges** (#2747). `pad` must be a finite number ≥ 0 and
   `fontSize` a finite number > 0, or they are the default (8 and 11): a
   negative pad clipped the drawing, a zero or negative font hid every
@@ -45,23 +51,30 @@ rule below, and the record-field grid is identical).
   NaN, is the default (36). `minLabelHeight` NaN is the default (14). The
   meaningful extremes keep their meaning: `maxCaption: Infinity` never
   truncates, `minLabelHeight: Infinity` puts every caption in the legend,
-  and `targetSize` is unchanged. `null` keeps 0.5.x's meaning (0) for `pad`.
+  and `targetSize` is unchanged. `null` keeps its 0.5.x meaning for `pad`
+  (0) and `fontSize` (emitted as is).
 
 ### Verdict changes — same input, different answer
 
-- **A `within` with a `null` or missing field** drew in 0.5.x (coerced to
-  0). It now draws nothing, so the records under it lose their legend
-  entries, `undersized` included. `isInteractive` and `targetSizeFinding`
-  themselves are unchanged.
-- The option-range changes move records across the legend's cramped
-  threshold (it depends on `fontSize`, `minLabelHeight` and `maxCaption`)
-  only for values listed above. No `undersized` answer changes for any
-  option value.
+Measured, not reasoned: each case below was run through the published 0.5.2
+and 0.6.0, comparing the legends (reviews/0.6.0-pre-minor-review.md M1).
+
+- **A `within` with a `null` x or y, or an `Infinity` width or height**,
+  drew in 0.5.2. It now draws nothing, with a note, so the records under it
+  lose their legend entries, `undersized` included.
+- **No other input changes an `undersized` answer.** That covers every
+  option-range value and every overflow, whose legends are identical to
+  0.5.2's. The option-range values can move a record across the legend's
+  cramped threshold, which depends on `fontSize`, `minLabelHeight` and
+  `maxCaption`. For example, `fontSize: 0` used to leave an 18 px box
+  uncramped; it now reads as 11, so the box's caption moves to the legend.
+  `isInteractive` and `targetSizeFinding` are unchanged.
 
 ### Measured
 
-- `dist/index.js`: 19,706 → 20,968 bytes (+1262); gzip -9 5,918 → 6,235
-  (+317). Cost: the pill stamp, the two notes and the range rules.
+- `dist/index.js`: 19,706 → 21,225 bytes (+1,519, +7.7%); gzip -9 5,918 →
+  6,327 (+409), as `bun run stability` prints it. Cost: the pill stamp, the
+  two notes, the range rules and the overflow path that keeps the legend.
 
 ## [0.5.2] - 2026-10-03
 

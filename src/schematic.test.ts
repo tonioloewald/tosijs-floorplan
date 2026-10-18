@@ -1476,4 +1476,31 @@ describe('0.6.0', () => {
     expect(schematic(d, { minLabelHeight: Infinity }).legend.length).toBe(2)
     expect(schematic(d).legend.length).toBe(1) // only the truncated caption
   })
+
+  test('refStyle pill: escaped, at its geometry, and left of a toggle (0.6.0 review)', () => {
+    const hostile = { ...button(), ref: '"><x a="b">&' }
+    const svg = schematicSVG(map([hostile]), { refStyle: 'pill' })
+    expect(svg).not.toContain('<x ')
+    expect(svg).toContain('&quot;&gt;&lt;x a=&quot;b&quot;&gt;&amp;</text>')
+    // ref '@42' (3 chars) on a box at x=10, width=80: the right edge is x+width-2 = 88
+    const pill = schematicSVG(map([button()]), { refStyle: 'pill' })
+    expect(pill).toContain('<rect x="71" y="11" width="18" height="9" rx="2" fill="#0f172a"')
+    expect(pill).toContain('<text x="87" y="18"')
+    // a toggle wears it just LEFT of the control (x - 3)
+    const toggle = { tag: 'input', type: 'checkbox', checked: true, value: 'x ⟷ a.on', ref: '@1', bounds: { x: 100, y: 10, width: 14, height: 14 } }
+    expect(schematicSVG(map([toggle]), { refStyle: 'pill' })).toContain('<text x="96" y="18"')
+  })
+
+  test('fontSize null keeps its 0.5.x meaning (emitted as is)', () => {
+    expect(schematicSVG(map([button()]), { fontSize: null as any })).toContain('font-size="null"')
+  })
+
+  test('an overflow keeps the legend: one far-off record does not erase the others (0.6.0 review)', () => {
+    const small = (x: number, width = 18) => ({ tag: 'button', text: 'b', on: { click: 'a.go' }, bounds: { x, y: 10, width, height: 18 } })
+    const r = schematic(map([small(10), small(-1e308, 1.5e308), small(1.7e308)]))
+    expect(r.note).toContain('overflows')
+    expect(r.legend.filter((e) => e.undersized).length).toBe(3)
+    expect(r.svg).not.toMatch(/Infinity|NaN/)
+  })
 })
+

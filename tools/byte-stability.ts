@@ -76,8 +76,9 @@ const FIXTURES: Record<string, object> = {
 // stale, and the fixture becomes a byte pin — an armed license can never
 // excuse the next drift.
 const EXPECTED_DIVERGENCE: Record<string, { divergesFrom: string; reason: string }> = {
-  // (empty since 0.5.0 published — its four verdict-change licenses
-  // self-expired on first post-publish run and the fixtures now pin bytes)
+  // the record-driven overflow: 0.5.2 printed an Infinity viewBox, 0.6.0
+  // an empty map with a note; the legend must stay identical (checked below)
+  far: { divergesFrom: 'tosijs-floorplan-0.5.2', reason: 'CHANGELOG 0.6.0: an overflowing extent says so (#2746)' },
 }
 
 // 0.6.0's deliberate option changes, licensed by RULE over the option grid
@@ -150,6 +151,16 @@ FIXTURES.inherited = {
     new ClassButton({ x: 10, y: 10, width: 20, height: 20 }),
     Object.create({ tag: 'a', href: '/x', text: 'go' }, { bounds: { value: { x: 50, y: 10, width: 18, height: 18 }, enumerable: true } }),
     Object.create({ tag: 'input', label: 'qty', value: '3 ⟷ app.qty' }, { bounds: { value: { x: 10, y: 50, width: 160, height: 30 }, enumerable: true } }),
+  ],
+}
+
+// boxes whose span passes Number.MAX_VALUE: the overflow driven by RECORDS,
+// not options (0.6.0 review gap 3) — the svg changes, the legend must not
+FIXTURES.far = {
+  wiring: [
+    { tag: 'button', text: 'near', on: { click: 'app.go' }, bounds: { x: 10, y: 10, width: 18, height: 18 } },
+    { tag: 'button', text: 'wide', on: { click: 'app.go' }, bounds: { x: -1e308, y: 10, width: 1.5e308, height: 18 } },
+    { tag: 'button', text: 'far', on: { click: 'app.go' }, bounds: { x: 1.7e308, y: 10, width: 18, height: 18 } },
   ],
 }
 
@@ -266,6 +277,13 @@ const main = async (dir: string): Promise<number> => {
   let gridRuns = 0
   let gridPassed = 0
   let gridLicensed = 0
+  // a licensed difference is in the svg; whether it reaches the LEGEND, and
+  // whether it moves an undersized verdict, is reported from output, so the
+  // CHANGELOG's Verdict section is written from this (0.6.0 review M1)
+  const legendMoved: string[] = []
+  const undersizedMoved: string[] = []
+  const legendOf = (lib: any, map: object, options: object | undefined) =>
+    lib.schematic(map, options).legend as { index: number; undersized?: string }[]
   for (const [name, map, options] of runs()) {
     const { verdict, message } = judge(
       name,
@@ -282,6 +300,20 @@ const main = async (dir: string): Promise<number> => {
       else if (verdict === 'licensed') gridLicensed++
       else console.log(message)
     }
+    if (verdict === 'licensed') {
+      const before = legendOf(published, map, options)
+      const after = legendOf(head, map, options)
+      if (JSON.stringify(before) !== JSON.stringify(after)) legendMoved.push(name)
+      const verdicts = (l: { index: number; undersized?: string }[]) =>
+        JSON.stringify(l.filter((e) => e.undersized != null).map((e) => [e.index, e.undersized]))
+      if (verdicts(before) !== verdicts(after)) undersizedMoved.push(name)
+    }
+  }
+  if (legendMoved.length + undersizedMoved.length > 0) {
+    const shapes = (names: string[]) =>
+      [...new Set(names.map((n) => n.slice(n.indexOf(' + ') + 3)))].join('; ')
+    console.log(`ℹ️  licensed runs whose legend changed: ${legendMoved.length}`)
+    console.log(`ℹ️  …whose undersized verdicts changed: ${undersizedMoved.length} — ${shapes(undersizedMoved)}`)
   }
   console.log(
     `${gridPassed + gridLicensed === gridRuns ? '✅' : '❌'} option grid: ${gridPassed}/${gridRuns} identical` +
