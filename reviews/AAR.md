@@ -2,6 +2,26 @@
 
 Newest first. Facts, not analysis — the quarterly pass asks the whys.
 
+## 0.6.0 — 2026-10-18
+
+- Went well: haltija's adoption of 0.5.2 produced the first real plugin
+  and producer feedback, and both shipped within the day (refStyle pill,
+  introspected). A rule-based, version-keyed license let a deliberate
+  output change pass the stability grid without hiding drift.
+- Didn't: the CHANGELOG Verdict section was reasoned, not measured, and
+  wrong (review M1). Measuring it exposed a real regression in the overflow
+  fix: one far-off record erased every record's legend. Fixed before the
+  tag.
+- Surprised: the review was clean apart from that one major, which per
+  #3219 rule 6 was fixed and cleared by a named check (the stability
+  tool's legend report) with no re-review round.
+- Friction: none at publish. Approval came inside the 60-minute window,
+  and the verify ran on its own.
+- Cycle: none.
+- Follow-through open: haltija to drop its pill plugin (board), tosijs pin
+  bump to 0.6.0 (#2804), stability per-part licensing (#3380),
+  #3387 neutralizeProvenance export (owner decision), #2829.
+
 ## 0.5.2 — 2026-10-03
 
 - Went well: fuzzing every record field × wrong types found #2748's real
