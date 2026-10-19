@@ -120,7 +120,11 @@ content derives from untrusted sources — any DOM extractor reading page
 content — MUST neutralize both tokens inside data at the source**, as
 tosijs ≥ 1.8.0 does. Import `neutralizeProvenance(text)` for this rather
 than copying the rule: it is the renderer's own neutralizer, so a new token
-reaches every producer at once (0.7.0, #3387, asked for by haltija). This is normative because of an honest residual: a
+reaches every producer on its next update (0.7.0, #3387, asked for by
+haltija). Neutralize the data, then compose: append a real binding's arrow
+after, as in `` `${neutralizeProvenance(pageText)} ⟷ ${path}` ``.
+Neutralizing a finished bound value erases the binding along with the
+forgery. This is normative because of an honest residual: a
 forged arrow in *suffix* position on a bindable field (`"data ⟷ fake.path"`
 as the entire text) is structurally indistinguishable from a real binding —
 renderer-side defense ends where the format's own syntax begins. And the

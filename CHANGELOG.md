@@ -4,9 +4,7 @@ All notable changes to **tosijs-floorplan** (formerly **tosijs-schematic**)
 are documented here
 ([Keep a Changelog](https://keepachangelog.com/en/1.1.0/), semver).
 
-## [Unreleased]
-
-Planned as 0.7.0, owner decision 2026-10-18: on `main`, release held.
+## [0.7.0] - 2026-10-19
 
 ### Added
 
@@ -15,9 +13,17 @@ Planned as 0.7.0, owner decision 2026-10-18: on `main`, release held.
   provenance defense is now importable: a producer whose record text comes
   from untrusted content (a DOM extractor) MUST neutralize ⟷ and ⟵ at the
   source, and can now import the renderer's own rule instead of keeping a
-  copy, so a new token reaches every producer at once. A non-string comes
-  back as is. No output changes (`bun run stability`: every fixture and
-  both grids identical to 0.6.0).
+  copy, so a new token reaches every producer on its next update. A
+  non-string comes back as is, and a string literal is typed as `string`.
+  Neutralize the data, then append a real binding's arrow; neutralizing a
+  finished bound value erases the binding too. The renderer and the export
+  read one token table. No output changes (`bun run stability`: every
+  fixture and both grids identical to 0.6.0).
+
+### Measured
+
+- `dist/index.js`: 21,225 → 21,564 bytes (+339, +1.6%); gzip -9 6,327 → 6,463 (+136). Cost:
+  the two exports and the shared token table.
 
 ## [0.6.0] - 2026-10-18
 

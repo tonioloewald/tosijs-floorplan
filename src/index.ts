@@ -240,15 +240,22 @@ const shownValue = (v: unknown): string | undefined => {
 // arrow tokens inside record data must neither ride a caption run
 // (geometry over glyphs) nor read as structure — neutralized the same way
 // tosijs ≥1.8.0 does at the source
+// ONE table: each provenance token and its neutral spelling. The renderer's
+// neutralizer and the exported PROVENANCE_TOKENS both read it, so a new
+// token can't reach one and miss the other (0.7.0 review)
+const PROVENANCE_REWRITES: readonly (readonly [string, string])[] = [
+  [BOUND_TWO_WAY, '<->'],
+  [BOUND_TO_DOM, '<-'],
+]
+
 const neutralizeArrows = (s: string): string =>
-  s.replaceAll(BOUND_TWO_WAY, '<->').replaceAll(BOUND_TO_DOM, '<-')
+  PROVENANCE_REWRITES.reduce((out, [token, neutral]) => out.replaceAll(token, neutral), s)
 
 /** every token the format reads as provenance, so a producer can scan for
  * them without hard-coding the set (#3387) */
-export const PROVENANCE_TOKENS: readonly string[] = Object.freeze([
-  BOUND_TWO_WAY,
-  BOUND_TO_DOM,
-])
+export const PROVENANCE_TOKENS: readonly string[] = Object.freeze(
+  PROVENANCE_REWRITES.map(([token]) => token)
+)
 
 /**
  * The producer-side half of the provenance defense (#3387): rewrite every
@@ -258,9 +265,16 @@ export const PROVENANCE_TOKENS: readonly string[] = Object.freeze([
  * "The record format"). It is the renderer's own neutralizer, so a new token
  * reaches every producer that imports it. Anything but a string comes back
  * as is.
+ *
+ * Neutralize the DATA, then compose: a real binding's arrow is appended
+ * after, `${neutralizeProvenance(pageText)} ⟷ ${path}`. Neutralizing a
+ * finished bound value erases the binding with the forgery.
  */
-export const neutralizeProvenance = <T>(text: T): T =>
-  (typeof text === 'string' ? neutralizeArrows(text) : text) as T
+export function neutralizeProvenance(text: string): string
+export function neutralizeProvenance<T>(text: T): T
+export function neutralizeProvenance(text: unknown): unknown {
+  return typeof text === 'string' ? neutralizeArrows(text) : text
+}
 
 // is this string a live two-way binding? Only the arrow in STRUCTURAL
 // position (last) counts — a ⟷ buried inside the data must not confer an

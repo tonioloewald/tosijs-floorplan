@@ -37,7 +37,8 @@ Install: `npm add tosijs-floorplan`
 - `neutralizeProvenance(text)` / `PROVENANCE_TOKENS` — the producer-side
   provenance defense: a producer whose record text comes from untrusted
   content (a DOM extractor) MUST pass it through this at the source.
-  Import it; don't copy the rule.
+  Import it; don't copy the rule. Neutralize the data, then append a real
+  binding's arrow: `${neutralizeProvenance(text)} ⟷ ${path}`.
 - `BOUND_TO_DOM` (`⟵`, display binding) and `BOUND_TWO_WAY` (`⟷`,
   user-writable) — the provenance tokens found inside bound value strings
   (`"<shown> <arrow> <path>"`).

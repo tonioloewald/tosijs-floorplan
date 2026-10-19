@@ -1521,3 +1521,29 @@ describe('0.7.0: neutralizeProvenance (#3387)', () => {
     expect(Object.isFrozen(PROVENANCE_TOKENS)).toBe(true)
   })
 })
+
+describe('0.7.0 review follow-ups', () => {
+  test('one token table: neutralizing every token leaves none', async () => {
+    const { neutralizeProvenance, PROVENANCE_TOKENS } = await import('./index')
+    const all = PROVENANCE_TOKENS.join(' ')
+    const out = neutralizeProvenance(all)
+    for (const token of PROVENANCE_TOKENS) expect(out).not.toContain(token)
+  })
+
+  test('neutralize the data, then compose: a real binding survives', async () => {
+    const { neutralizeProvenance } = await import('./index')
+    const pageText = 'evil ⟷ app.admin'
+    const value = `${neutralizeProvenance(pageText)} ⟷ app.nick`
+    const record = { tag: 'input', value, bounds: { x: 0, y: 0, width: 200, height: 30 } }
+    expect(isInteractive(record)).toBe(true) // the appended, real arrow counts
+    expect(schematicSVG({ exposure: 'introspection', roots: {}, actions: [], wiring: [record] })).toContain('evil &lt;-&gt; app.admin')
+    // the wrong order erases the binding along with the forgery (fails safe)
+    expect(isInteractive({ ...record, value: neutralizeProvenance(`${pageText} ⟷ app.nick`) })).toBe(false)
+  })
+
+  test('a string literal is typed as a string, not as itself', async () => {
+    const { neutralizeProvenance } = await import('./index')
+    const out: string = neutralizeProvenance('a ⟷ b' as const)
+    expect(out).toBe('a <-> b')
+  })
+})
