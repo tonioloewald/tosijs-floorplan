@@ -2,6 +2,24 @@
 
 Newest first. Facts, not analysis — the quarterly pass asks the whys.
 
+## 0.7.0 — 2026-10-19
+
+- Went well: a one-change minor. The review's follow-ups that touched the
+  public API (overload signature, one token table, the
+  neutralize-then-compose rule) were taken before the tag, while they were
+  still free.
+- Didn't: my tag command was chained to run whatever the dry run's
+  result. The dry run passed, but the tag shouldn't have depended on
+  luck.
+- Surprised: GitHub reported the build job as 'queued' while the stage job
+  had already received its tarball and staged it (stale status).
+- Friction: the 60-minute approval window expired again (third release out
+  of four); verify_only closed it.
+- Cycle: none.
+- Follow-through open: haltija to switch to neutralizeProvenance, tosijs
+  to switch from stripArrows and decide re-export (board), tosijs pin bump
+  to ≥ 0.7.0 (#2804), #2829, #3380.
+
 ## 0.6.0 — 2026-10-18
 
 - Went well: haltija's adoption of 0.5.2 produced the first real plugin
